@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --black: 33 33 33;
+    --white: 255 255 255;
+    --gray: 119 119 119;
+    --background: 180 33% 98%;
+  }
+}
+
+@layer base {
+  html {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background px-8 h-full flex items-center justify-center;
+    height: 100svh;
+  }
+}
+
+@layer components {
+  h1 {
+    @apply text-black text-2xl md:text-[28px] font-bold;
+  }
+  h2 {
+    @apply text-black text-2xl font-bold;
+  }
+  h3 {
+    @apply text-black text-xl font-bold;
+  }
+  p,
+  .paragraph,
+  a,
+  .link {
+    @apply text-black text-xl font-medium;
+  }
+  a,
+  .link {
+    @apply underline hover:scale-[1.01] transition;
+  }
+}
