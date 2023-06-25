@@ -16,7 +16,7 @@
     @apply h-full;
   }
   body {
-    @apply bg-background px-8 h-full flex items-center justify-center;
+    @apply bg-background px-8 h-full flex items-center justify-center overflow-hidden;
     height: 100svh;
   }
 }
