@@ -12,6 +12,7 @@ export const metadata: Metadata = {
     name: "Özgür ÖZALP",
     url: "https://linkedin.com/in/ozgurozalp",
   },
+  themeColor: "#f9fbfc",
   keywords: [
     "Özgür ÖZALP",
     "Özgür",
