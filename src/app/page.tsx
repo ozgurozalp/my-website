@@ -23,7 +23,7 @@ export default function Home() {
       </h1>
       <div className="flex flex-col gap-[5px]">
         {links.map((link) => (
-          <a key={link.url} className="self-start" href={link.url}>
+          <a key={link.url} className="self-start" target="_blank" href={link.url}>
             {link.name}
           </a>
         ))}
