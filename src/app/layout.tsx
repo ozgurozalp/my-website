@@ -1,8 +1,10 @@
+import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
-import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
+import { ReactNode } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,30 +43,28 @@ export const metadata: Metadata = {
   description: "Özgür ÖZALP is a Full Stack Developer based in Istanbul, TR.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        {children}
-        <Analytics />
-        <Script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-YB8VDD3BXG"
-        />
-        <Script id="google-analytics">
-          {`
+    <ClerkProvider>
+      <html lang="en">
+        <body className={inter.className}>
+          {children}
+          <Analytics />
+          <Script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-YB8VDD3BXG"
+          />
+          <Script id="google-analytics">
+            {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
         
           gtag('config', 'G-YB8VDD3BXG');
         `}
-        </Script>
-      </body>
-    </html>
+          </Script>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
