@@ -46,14 +46,6 @@ export default async function ProfilePage() {
               <UserButton afterSignOutUrl="/" />
             </div>
           </div>
-          <h4 className="text-md font-medium leading-3">About</h4>
-          <p className="text-sm text-stone-500">
-            👋 Greetings! I&apos;m Özgür ÖZALP, and I&apos;m a passionate Full
-            Stack Developer with a knack for crafting immersive digital
-            experiences. My journey in the world of web development has led me
-            to master an array of cutting-edge technologies, including React,
-            Vue, Node.js, and Laravel.
-          </p>
         </div>
       </div>
     </div>
