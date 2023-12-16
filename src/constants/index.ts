@@ -4,7 +4,7 @@ export const links = [
     url: "https://blog.ozgurozalp.com",
   },
   {
-    name: "Twitter",
+    name: "X fka Twitter",
     url: "https://twitter.com/ozqurozalp",
   },
   {
