@@ -1,5 +1,14 @@
+"use client";
 import { links } from "@/constants";
 import Image from "next/image";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -21,16 +30,30 @@ export default function Home() {
           </strong>
           <br />A Full Stack Developer based in Istanbul, TR.
         </h1>
-        <div className="flex flex-col gap-[5px]">
+        <div className="flex justify-between gap-[5px]">
           {links.map((link) => (
-            <a
-              key={link.url}
-              className="self-start"
-              target="_blank"
-              href={link.url}
-            >
-              {link.name}
-            </a>
+            <TooltipProvider key={link.url}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    className={cn(
+                      "self-start",
+                      buttonVariants({
+                        variant: "outline",
+                        size: "icon",
+                      }),
+                      "rounded-full"
+                    )}
+                    target="_blank"
+                    href={link.url}
+                  >
+                    {link.icon}
+                    <span className="sr-only">{link.name}</span>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{link.name}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ))}
         </div>
       </div>
