@@ -1,12 +1,13 @@
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/react";
-import { Metadata } from "next";
-import { Inter } from "next/font/google";
-import Script from "next/script";
-import { ClerkProvider } from "@clerk/nextjs";
 import { ReactNode } from "react";
+import { Poppins } from "next/font/google";
+import AppHeader from "@/components/shared/AppHeader";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "Özgür ÖZALP | Full Stack Developer",
@@ -14,7 +15,6 @@ export const metadata: Metadata = {
     name: "Özgür ÖZALP",
     url: "https://linkedin.com/in/ozgurozalp",
   },
-  themeColor: "#f9fbfc",
   keywords: [
     "Özgür ÖZALP",
     "Özgür",
@@ -41,30 +41,32 @@ export const metadata: Metadata = {
     shortcut: "/my-logo.png",
   },
   description: "Özgür ÖZALP is a Full Stack Developer based in Istanbul, TR.",
+  other: {
+    "apple-mobile-web-app-status-bar-style": "#f4f4f4",
+    "msapplication-navbutton-color": "#f4f4f4",
+    "msapplication-TileColor": "#f4f4f4",
+    "mobile-web-app-capable": "yes",
+  },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#f4f4f4" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f4f4" },
+  ],
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={inter.className}>
-          {children}
-          <Analytics />
-          <Script
-            async
-            src="https://www.googletagmanager.com/gtag/js?id=G-YB8VDD3BXG"
-          />
-          <Script id="google-analytics">
-            {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-        
-          gtag('config', 'G-YB8VDD3BXG');
-        `}
-          </Script>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className={poppins.className}>
+      <body>
+        <AppHeader />
+        {children}
+      </body>
+    </html>
   );
 }

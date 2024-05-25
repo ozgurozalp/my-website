@@ -1,6 +1,5 @@
 "use client";
 import { links } from "@/constants";
-import Image from "next/image";
 import {
   Tooltip,
   TooltipContent,
@@ -9,47 +8,55 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <section className="home-page">
-      <div className="w-full sm:w-[390px] flex flex-col gap-8 justify-center">
-        <Image
-          className="rounded-full aspect-square border-[5px] border-gray"
-          width={150}
-          height={150}
-          quality={100}
-          src="/ozgurozalp.png"
-          alt="Özgür ÖZALP"
-          draggable={false}
-        />
-        <h1>
-          Hello, I&apos;m{" "}
-          <strong className="p-1 inline-block bg-black text-white">
-            Özgür ÖZALP.
-          </strong>
-          <br />A Full Stack Developer based in Istanbul, TR.
-        </h1>
+    <section className="flex min-h-[--body-height] items-center gap-8 justify-center px-4 sm:px-8 overflow-hidden">
+      <div className="w-full sm:w-[360px] flex flex-col gap-8 justify-center">
+        <div className="bg-border rounded-full p-[3px] w-fit shadow shadow-border">
+          <img
+            className="rounded-full border-[3px] border-white aspect-square object-cover"
+            width={150}
+            height={150}
+            src="/ozgurozalp.png"
+            alt="Özgür ÖZALP"
+            draggable={false}
+          />
+        </div>
+        <div className="text-border text-3xl md:text-3xl font-semibold">
+          <div>
+            <span>Hello, I&apos;m</span>{" "}
+            <h1 className="px-1 py-2 text-2xl md:text-3xl inline-block bg-border">
+              <strong className="text-white pacifico-regular">
+                Özgür ÖZALP.
+              </strong>
+            </h1>
+          </div>
+          <div className="text-balance">
+            A Full Stack Developer based in Istanbul, TR.
+          </div>
+        </div>
         <div className="flex justify-between gap-[5px]">
           {links.map((link) => (
             <TooltipProvider key={link.url}>
-              <Tooltip>
+              <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
-                  <a
+                  <Link
                     className={cn(
                       "self-start",
                       buttonVariants({
                         variant: "outline",
-                        size: "icon",
+                        size: "icon-lg",
                       }),
-                      "rounded-full"
+                      "rounded-full p-0 aspect-square border-2 border-border",
                     )}
-                    target="_blank"
+                    target={link.url.startsWith("http") ? "_blank" : "_self"}
                     href={link.url}
                   >
-                    {link.icon}
+                    <link.icon className="size-6" />
                     <span className="sr-only">{link.name}</span>
-                  </a>
+                  </Link>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">{link.name}</TooltipContent>
               </Tooltip>
