@@ -138,7 +138,7 @@ function MobileMenu({
                   className={cn(
                     "align-center container block font-medium py-4 md:px-[34px] text-[22px]",
                   )}
-                  href={`/category/${category.slug}`}
+                  href={`/blog/category/${category.slug}`}
                 >
                   {category.name}
                 </Link>
