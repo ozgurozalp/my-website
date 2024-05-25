@@ -47,7 +47,7 @@ export default function AppHeader() {
           <Link
             onClick={() => setOpen(false)}
             className="flex items-center text-2xl font-semibold overflow-hidden max-h-[--header-height]"
-            href={path.startsWith("/blog") ? "/blog" : "/"}
+            href={path.startsWith("/blog/") ? "/blog" : "/"}
           >
             <AppLogo className="size-36" />
           </Link>
