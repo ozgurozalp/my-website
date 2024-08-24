@@ -3,6 +3,7 @@ import "./globals.css";
 import { ReactNode } from "react";
 import { Poppins } from "next/font/google";
 import AppHeader from "@/components/shared/AppHeader";
+import { GoogleTagManager } from "@next/third-parties/google";
 
 const poppins = Poppins({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
@@ -63,6 +64,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={poppins.className}>
+      <head>
+        <GoogleTagManager gtmId="GTM-KNSSMMKM" />
+      </head>
       <body>
         <AppHeader />
         {children}
