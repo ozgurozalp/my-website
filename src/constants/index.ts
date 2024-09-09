@@ -39,10 +39,12 @@ export const links = [
     url: "mailto:mail@ozgurozalp.com",
     icon: Envelope,
   },
+  /*
   {
     target: "_blank",
     name: "View my resume",
     url: "/ozgurozalp.pdf",
     icon: ReadCvLogo,
   },
+   */
 ];
