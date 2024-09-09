@@ -37,7 +37,7 @@ export default function Home() {
             A Full Stack Developer based in Istanbul, TR.
           </div>
         </div>
-        <div className="flex justify-between gap-[5px]">
+        <div className="flex justify-between flex-wrap items-center gap-[5px]">
           {links.map((link) => (
             <TooltipProvider key={link.url}>
               <Tooltip delayDuration={0}>
@@ -49,9 +49,13 @@ export default function Home() {
                         variant: "outline",
                         size: "icon-lg",
                       }),
-                      "rounded-full p-0 aspect-square border-2 border-border",
+                      "rounded-full p-0 aspect-square border-2 border-border shrink-0",
                     )}
-                    target={link.url.startsWith("http") ? "_blank" : "_self"}
+                    target={
+                      link.url.startsWith("http") || link?.target === "_blank"
+                        ? "_blank"
+                        : "_self"
+                    }
                     href={link.url}
                   >
                     <link.icon className="size-6" />
