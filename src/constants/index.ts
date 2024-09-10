@@ -11,6 +11,7 @@ import {
 export const links = [
   {
     name: "Blog",
+    target: "self",
     url: "/blog",
     icon: Newspaper,
   },
