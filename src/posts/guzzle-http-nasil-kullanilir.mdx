@@ -1,0 +1,144 @@
+---
+title: Guzzle HTTP Nasıl Kullanılır ?
+description: Merhaba, bugünkü yazımda sizlere Guzzle HTTP'nin ne olduğunu, nasıl kurulup, nasıl kullanıldığını, O halde başlayalım...
+createdAt: 2021-07-19
+updatedAt: 2021-07-19
+coverImage: /images/guzzle-http.jpg
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: https://github.com/ozgurozalp.png
+categories:
+  - php
+tags:
+  - composer
+  - http
+  - php
+---
+
+Merhaba, bugünkü yazımda sizlere [Guzzle HTTP](https://github.com/guzzle/guzzle)'nin ne olduğunu, nasıl kurulup, nasıl kullanıldığını, O halde başlayalım...
+
+## Guzzle HTTP Nedir ?
+
+Guzzle, [PHP](https://blog.ozgurozalp.com/kategori/php/ "PHP") programlama dilin de geliştirilmiş olan bir HTTP istemcisidir. Geliştirilme amacı ise; Göndermek istediğimiz HTTP isteklerinin kontrolünü ve kullanımını bizler için olabildiğince basit hale getirmektir.
+
+## Guzzle HTTP Nasıl Kurulur ?
+
+Bu HTTP kütüphanesini projenize dahil etmeniz için öncellikle [PHP](https://blog.ozgurozalp.com/kategori/php/ "PHP")'in paket yöneticisi olan [Composer](https://getcomposer.org/)'ın bilgisayarınızda kurulu olması lazım. Nasıl kurulur bilmiyorsanız [buraya tıklayınız.](https://www.youtube.com/watch?v=wmqB20fnfho "https://www.youtube.com/watch?v=wmqB20fnfho")
+
+Aşağıda vermiş olduğum kodu komut satırınıza yazın.
+
+```shell
+composer require guzzlehttp/guzzle
+```
+
+kurulum işlemi bittikten sonra proje klasörünüze aşağıda isimlerini vermiş olduğum 3 dosya ve klasör eklenecektir.
+
+- vendor klasörü
+- composer.json dosyası
+- composer.lock dosyası
+
+Ardından index.php dosyanızı açıp, en üst satıra aşağıda size vermiş olduğum kod parçasını yapıştırarak composer ile yüklediğimiz bu kütüphaneyi projemize dahil etmiş oluyoruz.
+
+```php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+```
+
+## Guzzle HTTP Nasıl Kullanılır ?
+
+Diyelim ki bir adrese GET isteği atarak bir takım veriler almamız gerekti. Bunu aşağıda size vermiş olduğum örnekler gibi yapıyoruz.
+
+```php
+<?php
+
+// Daha önceden eklediğimiz alan
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Sınıfımızı başlattık
+$client = new GuzzleHttp\Client();
+
+// adresimizi tanımladık
+$adres = "https://jsonplaceholder.typicode.com/users";
+
+// adresimize get isteğimizi atıp gelen sonucu cevap değişkenine atadık
+$cevap = $client->get($adres);
+
+// ve cevabımızı ekrana yazdırdık
+echo $cevap->getBody();
+
+```
+
+### POST isteği
+
+POST isteği genellikle veri ekleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
+
+```php
+<?php
+$cevap = $client->post('http://httpbin.org/post');
+```
+
+### GET isteği
+
+GET isteği ise adından da anlaşıldığı üzere veri alma işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
+
+```php
+<?php
+$cevap = $client->get('http://httpbin.org/get');
+```
+
+### PUT isteği
+
+PUT isteği genellikle veri güncelleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
+
+```php
+<?php
+$cevap = $client->put('http://httpbin.org/put');
+```
+
+### DELETE isteği
+
+DELETE isteği ise adından da anlaşıldığı üzere veri silme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
+
+```php
+<?php
+$cevap = $client->delete('http://httpbin.org/delete');
+```
+
+### PATCH isteği
+
+PATCH isteği genellikle veri güncelleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
+
+```php
+<?php
+$cevap = $client->patch('http://httpbin.org/patch');
+```
+
+### Base URL tanımlama
+
+Base URL tanımlamak, istek adresini her defasında uzun uzun girmekten kurtarır.
+
+```php
+<?php
+
+$client = new Client([
+    'base_uri' => 'https://blog.ozgurozalp.com/', // Kendi bağlantınız ile değiştirin
+]);
+```
+
+### Cevap durum kodu öğrenme
+
+```php
+<?php
+
+$cevap = $client->get('http://httpbin.org/get');
+echo $cevap->getStatusCode(); // 200, 201 gibi HTTP status kodları döner
+```
+
+Bu makale için benim anlatacaklarım bu kadar umarım faydalı olmuştur.
+
+Guzzle HTTP kütüphanesi için daha detaylı ve bol örnekli anlatım için kendi sitesindeki dökümanı okumanızı tavsiye ederim. Dökümana ulaşmak için [tıklayın](https://docs.guzzlephp.org/en/stable/index.html "https://docs.guzzlephp.org/en/stable/index.html").
+
+Not: Kendi dökümanı ingilizcedir.

@@ -1,26 +1,25 @@
 import { cn, dateFormat } from "@/lib/utils";
 import Link from "next/link";
-import { allBlogs } from "@/../content";
-import { CATEGORIES } from "@/lib/constants";
+import { BlogWithCategory } from "@/types";
 
 interface BlogCardProps {
-  blog: ReturnType<typeof allBlogs.all>[number];
+  blog: BlogWithCategory;
   className?: string;
 }
 
-function getCategoryNameBySlug(slug: string) {
-  return CATEGORIES.find((category) => category.slug === slug)?.name;
-}
+export default async function BlogCard({ blog, className }: BlogCardProps) {
+  const path = blog.getPath();
+  const frontMatter = await blog.getExportValueOrThrow("frontmatter");
+  const url = `/blog/${path}`;
 
-export default function BlogCard({ blog, className }: BlogCardProps) {
   return (
     <article className={cn("blog-card-container", className)}>
-      <Link className={cn("blog-card-cover")} href={blog.pathname}>
+      <Link className={cn("blog-card-cover")} href={url}>
         <img
           width={1980}
           height={1200}
-          alt={blog.frontMatter.title}
-          src={blog.frontMatter.coverImage}
+          alt={frontMatter.title}
+          src={frontMatter.coverImage}
           className="block object-cover aspect-video w-full h-full absolute inset-0"
         />
       </Link>
@@ -28,40 +27,38 @@ export default function BlogCard({ blog, className }: BlogCardProps) {
         <div className="flex flex-col gap-1">
           <div className="flex mt-auto justify-between">
             <time
-              dateTime={blog.frontMatter.createdAt.toString()}
+              dateTime={frontMatter.createdAt.toString()}
               className={cn("blog-card-date")}
             >
-              {dateFormat(blog.frontMatter.createdAt)}
+              {dateFormat(frontMatter.createdAt)}
             </time>
             <div className={cn("blog-card-categories")}>
-              {blog.frontMatter.categories.map(
+              {frontMatter.categories?.map(
                 (category: string, index: number) => (
                   <Link
                     key={index}
                     className={cn("blog-card-tag-link")}
-                    href={`/category/${category}`}
+                    href={`/blog/category/${category}`}
                   >
-                    #{getCategoryNameBySlug(category)}
+                    #{category}
                   </Link>
                 ),
               )}
             </div>
           </div>
-          <Link href={blog.pathname}>
-            <h2 className={cn("blog-card-title")}>{blog.frontMatter.title}</h2>
+          <Link href={url}>
+            <h2 className={cn("blog-card-title")}>{frontMatter.title}</h2>
           </Link>
         </div>
-        <p className={cn("blog-card-description")}>
-          {blog.frontMatter.description}
-        </p>
+        <p className={cn("blog-card-description")}>{frontMatter.description}</p>
         <div className={cn("blog-card-author")}>
           <figure className={cn("blog-card-author-figure")}>
             <span className="absolute inset-0 block">
               <img
                 width={34}
                 height={34}
-                alt={blog.frontMatter.author.name}
-                src={blog.frontMatter.author.avatar}
+                alt={frontMatter.author.name}
+                src={frontMatter.author.avatar}
                 className="rounded-full absolute h-full w-full object-cover inset-0"
               />
             </span>
@@ -71,12 +68,12 @@ export default function BlogCard({ blog, className }: BlogCardProps) {
               target="_blank"
               rel="noopener noreferrer"
               className="hover:underline text-balance text-base md:text-xl leading-[none]"
-              href={blog.frontMatter.author.url}
+              href={frontMatter.author.url}
             >
-              <span>{blog.frontMatter.author.name}</span>
+              <span>{frontMatter.author.name}</span>
             </Link>
             <span className="text-sm leading-[none]">
-              {blog.frontMatter.author.title}
+              {frontMatter.author.title}
             </span>
           </div>
         </div>

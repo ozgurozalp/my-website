@@ -5,7 +5,6 @@ import {
   LinkedinLogo,
   Newspaper,
   XLogo,
-  ReadCvLogo,
 } from "@phosphor-icons/react";
 
 export const links = [

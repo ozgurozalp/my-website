@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { Poppins } from "next/font/google";
 import AppHeader from "@/components/shared/AppHeader";
 import { GoogleTagManager } from "@next/third-parties/google";
+import { getCategories } from "@/actions";
 
 const poppins = Poppins({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
@@ -12,6 +13,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "Özgür ÖZALP | Full Stack Developer",
+  metadataBase: new URL("https://ozgurozalp.com"),
   authors: {
     name: "Özgür ÖZALP",
     url: "https://linkedin.com/in/ozgurozalp",
@@ -57,18 +59,19 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const categories = await getCategories();
   return (
     <html lang="en" className={poppins.className}>
       <head>
         <GoogleTagManager gtmId="GTM-KNSSMMKM" />
       </head>
       <body>
-        <AppHeader />
+        <AppHeader categories={categories} />
         {children}
       </body>
     </html>

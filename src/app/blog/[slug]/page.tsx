@@ -1,54 +1,46 @@
-import { notFound } from "next/navigation";
-import { allBlogs } from "../../../../content";
 import { dateFormat } from "@/lib/utils";
 import { Metadata } from "next";
+import { posts } from "@/collections";
 
-type Props = { params: { slug: string } };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
 
-export function generateStaticParams() {
-  return allBlogs.paths().map((pathname) => ({ slug: pathname }));
+export async function generateStaticParams() {
+  const allPosts = await posts.getEntries();
+  return allPosts.map((post) => ({ slug: post.getName() }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const doc = await allBlogs.get(params.slug);
-
-  if (!doc) {
-    return {};
-  }
-
-  const { frontMatter } = doc;
+  const post = await posts.getFileOrThrow((await params).slug, "mdx");
+  const frontmatter = await post.getExportValueOrThrow("frontmatter");
 
   return {
-    title: frontMatter.title,
-    description: frontMatter.description,
+    title: frontmatter.title,
+    description: frontmatter.description,
     authors: {
-      url: frontMatter.author.url,
-      name: frontMatter.author.name,
+      url: frontmatter.author.url,
+      name: frontmatter.author.name,
     },
-    category: frontMatter.categories.join(", "),
+    category: frontmatter.categories?.join(", "),
     openGraph: {
-      title: frontMatter.title,
-      description: frontMatter.description,
-      images: frontMatter.coverImage,
+      title: frontmatter.title,
+      description: frontmatter.description,
+      images: frontmatter.coverImage,
     },
     twitter: {
-      title: frontMatter.title,
-      description: frontMatter.description,
-      images: frontMatter.coverImage,
+      title: frontmatter.title,
+      description: frontmatter.description,
+      images: frontmatter.coverImage,
     },
   };
 }
 
 export default async function Page({ params }: Props) {
-  const doc = await allBlogs.get(params.slug);
-
-  if (!doc) {
-    return notFound();
-  }
-
-  const { Content, frontMatter } = doc;
-
-  const Document = Content as JSX.ElementType;
+  const post = await posts.getFileOrThrow((await params).slug, "mdx");
+  const frontMatter = await post.getExportValueOrThrow("frontmatter");
+  const Content = await post.getExportValueOrThrow("default");
 
   return (
     <article>
@@ -79,7 +71,7 @@ export default async function Page({ params }: Props) {
                 alt={frontMatter.title}
               />
               <div className="prose p-4 sm:p-10 max-w-full prose-gray transition-all prose-headings:relative prose-headings:scroll-mt-20 prose-headings:font-display prose-headings:font-bold">
-                <Document />
+                <Content />
               </div>
             </div>
             <div className="sticky top-16 lg:top-1 col-span-1 hidden flex-col divide-y divide-gray-200 self-start sm:flex">

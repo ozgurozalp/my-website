@@ -1,0 +1,77 @@
+---
+title: React Nedir ?
+description: React, etkileşimli kullanıcı arayüzü oluşturmayı zahmetsiz hale getirir. Siz uygulamanızdaki her bir durum için basit görünümler tasarlarken, React da verileriniz değiştiğinde sadece doğru bileşenleri etkili bir biçimde günceller ve yorumlar.
+createdAt: 2019-10-03
+updatedAt: 2019-10-03
+coverImage: /images/rn.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: https://github.com/ozgurozalp.png
+categories:
+  - js
+tags:
+  - cdn
+  - javascript
+  - node-js
+  - npm
+  - react
+---
+
+React, etkileşimli kullanıcı arayüzü oluşturmayı zahmetsiz hale getirir. Siz uygulamanızdaki her bir durum için basit görünümler tasarlarken, React da verileriniz değiştiğinde sadece doğru bileşenleri etkili bir biçimde günceller ve yorumlar.
+
+_Bu ne kardeşim diyor olabilirsiniz şu an o zaman bir de şu şekilde anlatıyım size._
+
+![](/images/react.png)
+
+React diğer bir adıyla React.js bir JavaScript kütüphanesidir. Facebook tarafından 2013 yılında geliştirilip piyasaya sürülmüştür. Facebook'un bu kütüphaneyi geliştirmesindeki asıl amacı kullanıcı sayısıyla birlikte artan sunucu yükünü istemci(yani tarayıcı) tarafına aktararak hem sunucularını rahatlatıp hem de anlık güncelleme işlemlerini bu kütüphane ile yapmaya sağlamaktır.
+
+## Peki web projelerimizde React'ı nasıl kullanırız ?
+
+React'ı iki farklı şekilde kullanabilirsiniz
+
+#### Yöntem 1
+
+Aşağıda size vermiş olduğum script taglarını html sitenizin en altına yapıştırarak React'ı web projenize dahil etmiş olucaksınız
+
+```html
+<script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+```
+
+#### Yöntem 2
+
+Bu yöntem öncekine göre biraz daha karışık zor gibi gelebilir fakar hiç öyle gözüktüğü gibi zor değil. Öncellikle bilgisayarınızda npm'in kurulu olması gerekiyor eğer kurulu değil ise [https://nodejs.org/en/download/](https://nodejs.org/en/download/) adresinden gerekli olan setup'ı indirerek dakikalar içerisinde npm'i kurabilirsiniz.
+
+Kurulum tamamlandıktan sonra _**CMD, PowerShell, Bash, Terminal**_ gibi araçlardan herhangi birini açıp **npm -v** yazıp enter tuşuna bastığınızda aşağıdaki görseldeki gibi versiyon numarasını gördüyseniz kurulum başarılı bir şekilde tamamlanmış demektir.
+
+![](/images/npm-js.png)
+
+NPM'in hangi versiyonunun kurulduğunu da öğrendiğimize göre React'ı artık kuralım değil mi ?
+
+```shell
+cd desktop
+```
+
+Yukarıda görmüş olduğunuz komut ile masaüstü dizine giriyoruz
+
+```shell
+npx create-react-app ilkReactProjem
+```
+
+Bu kod ise React.js'in tüm gerekli dosyalarını masaüstünde **ilkReactProjem** isminde bir klasör içerisine yükleyerek bizlere herşeyi hazırlıyor.
+
+```shell
+cd ilkReactProjem
+npm start
+```
+
+Son olarak bu 2 kod bloğunu sırasıyla çalıştırarak **ilkReactProjem** klasörü içerisine girip projemize start veriyoruz ve tarayıcımızdan [http://localhost:3000/](http://localhost:3000/) adresine girip projemize bakabiliriz. Karşınızda aşağıdaki gibi bir sayfa çıkması lazım eğer çıkmadıysa size anlattığım adımları tekrardan denemenizi öneririm.
+
+![](/images/react-3000port.png)
+
+React için daha detaylı bilgi için kendi sitesini sizlere tavsiye ederim.
+[https://tr.reactjs.org/](https://tr.reactjs.org/)

@@ -1,0 +1,82 @@
+---
+title: VueJS nedir, Neden kullanmalıyız ?
+description: Merhabalar, bu yazımda size JavaScript Framework'ü olan VueJs hakkında ufak tefek bilgiler vereceğim.
+createdAt: 2018-10-18
+updatedAt: 2018-10-18
+coverImage: /images/vue.js.jpg
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: https://github.com/ozgurozalp.png
+categories:
+  - js
+tags:
+  - cdn
+  - javascript
+  - npm
+  - vuejs
+---
+
+Merhabalar, bu yazımda size JavaScript Framework'ü olan **VueJs** hakkında ufak tefek bilgiler vereceğim.
+
+<img
+  style={{ width: "200px", marginInline: "auto" }}
+  alt="VueJs eğitimi"
+  src="/images/logo.png"
+/>
+
+Eğer benim yazımdan değil de kendi sitesinden bakıp öğrenmek isterseniz diye de buraya VueJs'in kendi sitesinin linkini sizler için bırakıyorum :) [**buraya tıklamanız yeterli**](https://vuejs.org/)
+
+**VueJs** aslında bir JavaScript Framework'ü dür.
+
+## Peki bu VueJS bize neler sağlar ve neden kullanmalıyız ?
+
+- Dinamik web siteleri yapmamızı sağlar.
+- Mobil uygulama tarzında görünümler elde ederiz.
+- Sitelerimiz hızlı yüklenir kullanıcı dostudur
+
+## VueJs'i nasıl sitemizde kullanırız ?
+
+Sitemizin head blokları arasına aşağıda size vermiş olduğum kodu yapıştırmanız yeterlidir.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+```
+
+Ardından bir div oluşturup içine id attribute'ü ekliyoruz aşağıda size bir örnek verdim :)
+
+```html
+<div id="app"></div>
+```
+
+Bu adımı da yaptıktan sonra Vue Instance denilen kodlarımızı oluşturuyoruz aşağıda örnek kodu bulabilirsiniz.
+
+```vue
+<script>
+new Vue({
+  el: "#app",
+  data: {
+    mesaj: "Özgür ÖZALP",
+  },
+});
+</script>
+```
+
+Farkettiyseniz **el** property sine divimizin idsini yazdık bunun sebebi çalışma alanımızı VueJs'e bildirmemiz gerekli yoksa uygulamamız çalışmayacaktır.
+
+Son olarak divimizin içine bir h1 elementi ekleyip içerisini 2 adet iç içe süslü parantezler arasında yukardaki kodda belirlediğimiz mesaj isimli arkadaşı ekliyoruz aşağıda sizi bir örnek bekliyor olacak :) 
+
+```vue
+<div id="app">
+  <h1> {{ mesaj }} </h1>
+</div>
+```
+
+En heyecanlı bölüme geldik yazdığımız kodları canlı canlı test etme evet şimdi yazdığımız kodları tarayıcımızda çalıştırıyoruz.
+
+# Tadaaa işte uygulamamız çalışıyor.
+
+![Ve](/images/makale.png)
+
+Umarım okurken ve VueJs'in ne olduğunu öğrenirken keyif almışsınızdır. Bir sonraki yazımda görüşmek üzere...

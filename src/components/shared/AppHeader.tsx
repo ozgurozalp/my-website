@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { CATEGORIES } from "@/lib/constants";
+
 import { cn } from "@/lib/utils";
 import AppLogo from "@/components/shared/AppLogo";
 import { AnimatePresence, motion } from "framer-motion";
@@ -9,7 +9,7 @@ import { useThrottle } from "@uidotdev/usehooks";
 import { useEventListener, useWindowSize } from "usehooks-ts";
 import { usePathname } from "next/navigation";
 
-export default function AppHeader() {
+export default function AppHeader({ categories }: { categories: string[] }) {
   const [open, setOpen] = useState(false);
   const { width } = useWindowSize();
   const throttledWidth = useThrottle(width, 500);
@@ -23,18 +23,6 @@ export default function AppHeader() {
     if (!throttledWidth) return;
     setOpen(false);
   }, [throttledWidth]);
-
-  /*
-  const blogs = allBlogs.all();
-
-  const categoriesOnlyHasOneBlog = CATEGORIES.filter((category) => {
-    return (
-      blogs.filter((blog) =>
-        blog.frontMatter.categories.includes(category.slug),
-      ).length === 1
-    );
-  });
-   */
 
   return (
     <>
@@ -51,18 +39,23 @@ export default function AppHeader() {
           >
             <AppLogo className="size-36" />
           </Link>
-          <nav className="rounded-4xl hidden lg:flex [&>*]:shrink-0 items-center p-1 text-lg h-14 leading-[22px] border-2 bg-white border-[--brand]">
-            {CATEGORIES.map((category, index) => (
+          <nav className="group rounded-4xl hidden lg:flex [&>*]:shrink-0 items-center p-1 text-lg h-14 leading-[22px] border-2 bg-white border-[--brand]">
+            {categories.map((category, index) => (
               <Link
+                data-active={path === `/blog/category/${category}`}
                 className={cn(
-                  "px-7 h-full flex items-center -mx-2 hover:bg-[--brand] hover:text-white transition-all rounded-full",
+                  "px-7 h-full flex items-center -mx-2 transition-all rounded-full",
                   index === 0 && "!ml-0",
-                  index === CATEGORIES.length - 1 && "!mr-0",
+                  index === categories.length - 1 && "!mr-0",
+                  "data-[active=false]:hover:bg-[--brand] data-[active=false]:hover:text-white",
+                  "data-[active=true]:bg-[--brand] data-[active=true]:text-white",
+                  "group-hover:data-[active=true]:!bg-transparent group-hover:data-[active=true]:text-black",
+                  "group-hover:data-[active=true]:hover:!bg-[--brand] group-hover:data-[active=true]:hover:text-white",
                 )}
-                key={category.slug}
-                href={`/blog/category/${category.slug}`}
+                key={category}
+                href={`/blog/category/${category}`}
               >
-                {category.name}
+                {category.toUpperCase()}
               </Link>
             ))}
           </nav>
@@ -109,17 +102,19 @@ export default function AppHeader() {
           </button>
         </div>
       </header>
-      <MobileMenu open={open} setOpen={setOpen} />
+      <MobileMenu categories={categories} open={open} setOpen={setOpen} />
     </>
   );
 }
 
 function MobileMenu({
   open,
+  categories,
   setOpen,
 }: {
   open: boolean;
   setOpen: Dispatch<SetStateAction<boolean>>;
+  categories: string[];
 }) {
   return (
     <AnimatePresence>
@@ -131,16 +126,16 @@ function MobileMenu({
           className="flex flex-col justify-between bg-background/95 fixed border-t-2 max-w-full w-full pointer-events-auto bottom-0 z-50 top-[--header-height] mobile-menu-open"
         >
           <nav>
-            {CATEGORIES.map((category, index) => (
-              <div key={category.slug} className="border-b-2 border-dashed">
+            {categories.map((category) => (
+              <div key={category} className="border-b-2 border-dashed">
                 <Link
                   onClick={() => setOpen(false)}
                   className={cn(
                     "align-center container block font-medium py-4 md:px-[34px] text-[22px]",
                   )}
-                  href={`/blog/category/${category.slug}`}
+                  href={`/blog/category/${category}`}
                 >
-                  {category.name}
+                  {category.toUpperCase()}
                 </Link>
               </div>
             ))}

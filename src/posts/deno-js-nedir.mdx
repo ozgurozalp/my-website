@@ -1,0 +1,99 @@
+---
+title: Deno Nedir ?
+description: JavaScript ile ilgileniyorsanız muhakkak Deno (Deno Land) ismini duymuşsunuzdur ve haliyle ne olduğunu merak edip kendinizi bu yazıyı okurken buldunuz. 😊
+createdAt: 2020-05-23
+updatedAt: 2020-05-23
+coverImage: /images/deno.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: https://github.com/ozgurozalp.png
+categories:
+  - js
+tags:
+  - deno
+  - javascript
+  - node-js
+  - v8-engine
+---
+
+**JavaScript** ile ilgileniyorsanız muhakkak **Deno (Deno Land)** ismini duymuşsunuzdur ve haliyle ne olduğunu merak edip kendinizi bu yazıyı okurken buldunuz. 😊
+
+### Peki nedir bu Deno ?
+
+Bildiğiniz üzere **JavaScript** normal şartlarda client (tarayıcı) tarafında çalışan bir programlama dilidir. **Deno** ise JavaScript'i diğer backend programlama dilleri gibi kullanmamızı sağlayan bir aracı gibi düşünebiliriz.
+
+### Deno nasıl çalışıyor ?
+
+**Deno**, Google'ın geliştirdiği V8 **JavaScript** motorunu Chrome Tarayıcısı dışına çıkararak tüm bilgisayarı kapsayacak bir etki alanında çalışma imkanı sunuyor.
+
+### Deno bir programlama dili mi ?
+
+Evet güzel bir soru, **Deno** bir programlama dili değildir. **JavaScript** kodları yazmaya yine aynı şekilde devam ediyoruz.
+
+### Deno'nun başlıca özellikleri
+
+- **JavaScript'in** tüm yeniliklerini destekler. (En şahanesi de bence bu)
+- **Node.js**'e kıyasla çok daha güvenlidir.
+- Kendi içerisinde **TypeScript** desteğiyle birlikte gelir.
+- NPM'in package.json dosyasına ihtiyaç duymadan kütüphane eklemenizi sağlar.
+
+### Deno nasıl kurulur ?
+
+Deno'yu bilgisayarınıza kurmanız için şimdilik bir setup dosyası bulunmamaktadır. Sadece terminal ekranından yazacağınız birkaç satır kod ile kurulabilmektedir.
+
+Aşağıya kullandığınız işletim sistemine ve terminale göre gerekli kodları sizler için bırakıyorum merak etmeyin 🤗
+
+```shell
+curl -fsSL https://deno.land/x/install/install.sh | sh
+```
+#
+```shell
+iwr https://deno.land/x/install/install.ps1 -useb | iex
+```
+#
+```shell
+brew install deno
+```
+#
+```shell
+choco install deno
+```
+#
+```shell
+scoop install deno
+```
+
+Kurulum işlemi bittikten sonra tekrardan terminal ekranında aşağıdaki kodu girip kurulumun başarılı olup olmadığını anlayabilirsiniz.
+
+```shell
+deno --version
+```
+
+aşağıdaki görseldeki gibi bir sonuç alıyorsanız kurulum başarılıysa tamamlanmış demektir.
+
+![](/images/siteGorseli.png)
+
+### Bitişi küçük bir 'Hello World' uygulamasıyla yapmak gerekirse
+
+Masaüstünüzde adı index.js olan bir dosya oluşturun ve içine aşağıda size vermiş olduğum kodları yapıştırın.
+
+```javascript
+const message = "Hello World";
+console.log(message);
+```
+
+Ardından terminal üzerinden şu komutla index.js dosyamızı çalıştıralım.
+
+```shell
+deno run index.js
+```
+
+Ve sonuç...
+
+![](/images/siteSonucGorseli.png)
+
+Bu makalelik benden bu kadar **Deno** ile ilgili daha fazla bilgi için [buraya](https://deno.land/) tıklayarak kendi sitesinden erişebilirsiniz.
+
+Sağlıcakla kalın...
