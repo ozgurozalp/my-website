@@ -1,6 +1,7 @@
-import { dateFormat } from "@/lib/utils";
-import { Metadata } from "next";
+import { dateFormat, getParentMetadata } from "@/lib/utils";
+import { Metadata, ResolvingMetadata } from "next";
 import { posts } from "@/collections";
+import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -12,12 +13,17 @@ export async function generateStaticParams() {
   return allPosts.map((post) => ({ slug: post.getName() }));
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(
+  { params }: Props,
+  parent: ResolvingMetadata,
+): Promise<Metadata> {
+  const prevMetadata = await getParentMetadata(parent);
   const post = await posts.getFileOrThrow((await params).slug, "mdx");
   const frontmatter = await post.getExportValueOrThrow("frontmatter");
+  const title = frontmatter.title;
 
   return {
-    title: frontmatter.title,
+    title,
     description: frontmatter.description,
     authors: {
       url: frontmatter.author.url,
@@ -25,12 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     category: frontmatter.categories?.join(", "),
     openGraph: {
-      title: frontmatter.title,
+      ...(prevMetadata?.openGraph ?? {}),
+      title,
       description: frontmatter.description,
       images: frontmatter.coverImage,
     },
     twitter: {
-      title: frontmatter.title,
+      ...(prevMetadata?.twitter ?? {}),
+      title,
       description: frontmatter.description,
       images: frontmatter.coverImage,
     },
@@ -38,7 +46,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
-  const post = await posts.getFileOrThrow((await params).slug, "mdx");
+  const post = await posts.getFile((await params).slug, "mdx");
+  if (!post) return notFound();
   const frontMatter = await post.getExportValueOrThrow("frontmatter");
   const Content = await post.getExportValueOrThrow("default");
 

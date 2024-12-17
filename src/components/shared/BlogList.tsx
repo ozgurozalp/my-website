@@ -2,6 +2,7 @@ import { BlogCard } from "@/components/shared/blog-card";
 import { cn } from "@/lib/utils";
 import { posts } from "@/collections";
 import { Blog, BlogWithCategory } from "@/types";
+import NotFound from "@/components/shared/not-found";
 
 interface BlogListProps {
   category?: string;
@@ -41,19 +42,6 @@ export default async function BlogList({ category }: BlogListProps) {
           />
         );
       })}
-    </div>
-  );
-}
-
-function NotFound({ category }: { category?: string }) {
-  return (
-    <div className="flex items-center">
-      <div className="uppercase border-2 border-[--brand] rounded-3xl w-fit mx-auto p-6 sm:p-8 text-center sm:text-[1.875rem]">
-        <h1>
-          No blogs found in{" "}
-          {category ? `category '${category}'` : "this website"}
-        </h1>
-      </div>
     </div>
   );
 }

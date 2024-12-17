@@ -1,18 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
 import { ReactNode } from "react";
 import { Poppins } from "next/font/google";
 import AppHeader from "@/components/shared/AppHeader";
 import { GoogleTagManager } from "@next/third-parties/google";
 import { getCategories } from "@/actions";
+import "./globals.css";
 
 const poppins = Poppins({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
   subsets: ["latin"],
 });
 
+const title = "Özgür ÖZALP - Full Stack Developer";
+const description =
+  "Özgür ÖZALP is a Full Stack Developer based in Istanbul, TR.";
+
 export const metadata: Metadata = {
-  title: "Özgür ÖZALP | Full Stack Developer",
+  title,
+  description,
   metadataBase: new URL("https://ozgurozalp.com"),
   authors: {
     name: "Özgür ÖZALP",
@@ -43,12 +48,21 @@ export const metadata: Metadata = {
     apple: "/my-logo.png",
     shortcut: "/my-logo.png",
   },
-  description: "Özgür ÖZALP is a Full Stack Developer based in Istanbul, TR.",
   other: {
     "apple-mobile-web-app-status-bar-style": "#f4f4f4",
     "msapplication-navbutton-color": "#f4f4f4",
     "msapplication-TileColor": "#f4f4f4",
     "mobile-web-app-capable": "yes",
+  },
+  openGraph: {
+    title,
+    description,
+  },
+  twitter: {
+    title,
+    description,
+    card: "summary_large_image",
+    site: "https://ozgurozalp.com",
   },
 };
 
