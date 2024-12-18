@@ -12,6 +12,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
+      url: "https://ozgurozalp.com/about",
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 1,
+    },
+    {
+      url: "https://ozgurozalp.com/ben-kimim",
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 1,
+    },
+    {
       url: "https://ozgurozalp.com/blog",
       lastModified: new Date(),
       changeFrequency: "monthly",
@@ -21,10 +33,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const post of allPosts) {
     const path = post.getPath();
+    const frontMatter = await post.getExportValueOrThrow("frontmatter");
 
     mainUrls.push({
       url: `https://ozgurozalp.com/blog${path}`,
-      lastModified: new Date(),
+      lastModified: frontMatter.updatedAt,
       changeFrequency: "monthly",
       priority: 0.8,
     });
