@@ -1,6 +1,5 @@
 import { CodeBlock, CodeInline } from "renoun/components";
 import type { MDXComponents } from "renoun/mdx";
-import { bundledLanguages } from "shiki/bundle/web";
 
 export function useMDXComponents() {
   return {
@@ -10,13 +9,14 @@ export function useMDXComponents() {
       );
     },
     pre: (props) => {
-      const { value, language } = CodeBlock.parsePreProps(props);
+      const { value, language, ...rest } = CodeBlock.parsePreProps(props);
       return (
         <CodeBlock
+          showLineNumbers
           allowErrors
+          shouldFormat
           value={value}
-          // @ts-expect-error - bundledLanguages is a const object
-          language={bundledLanguages[language] ?? language}
+          language={language}
         />
       );
     },
