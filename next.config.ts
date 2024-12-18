@@ -12,4 +12,13 @@ const withMDX = createMDXPlugin({
 export default withMDX({
   pageExtensions: ["js", "jsx", "ts", "tsx", "md", "mdx"],
   transpilePackages: ["renoun"],
+  async redirects() {
+    return [
+      {
+        source: "/kategori/:slug",
+        destination: "/blog/category/:slug",
+        permanent: true,
+      },
+    ];
+  },
 });
