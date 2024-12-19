@@ -1,5 +1,4 @@
 import { BlogCard } from "@/components/shared/blog-card";
-import { cn } from "@/lib/utils";
 import { posts } from "@/collections";
 import { Blog, BlogWithCategory } from "@/types";
 import NotFound from "@/components/shared/not-found";
@@ -32,15 +31,9 @@ export default async function BlogList({ category }: BlogListProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-6">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 content-between lg:gap-6 blog-list">
       {allPosts.map((blog, index) => {
-        return (
-          <BlogCard
-            key={index}
-            blog={blog}
-            className={cn("grow-0", allPosts.length < 2 && "!h-fit")}
-          />
-        );
+        return <BlogCard key={index} blog={blog} />;
       })}
     </div>
   );
