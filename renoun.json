@@ -1,0 +1,16 @@
+{
+  "languages": [
+    "css",
+    "js",
+    "jsx",
+    "ts",
+    "tsx",
+    "md",
+    "mdx",
+    "sh",
+    "json",
+    "html",
+    "php",
+    "vue"
+  ]
+}

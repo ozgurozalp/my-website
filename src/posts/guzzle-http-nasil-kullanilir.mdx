@@ -41,7 +41,7 @@ kurulum işlemi bittikten sonra proje klasörünüze aşağıda isimlerini vermi
 
 Ardından index.php dosyanızı açıp, en üst satıra aşağıda size vermiş olduğum kod parçasını yapıştırarak composer ile yüklediğimiz bu kütüphaneyi projemize dahil etmiş oluyoruz.
 
-```text
+```php
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
@@ -51,7 +51,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 Diyelim ki bir adrese GET isteği atarak bir takım veriler almamız gerekti. Bunu aşağıda size vermiş olduğum örnekler gibi yapıyoruz.
 
-```text
+```php
 <?php
 
 // Daha önceden eklediğimiz alan
@@ -75,7 +75,7 @@ echo $cevap->getBody();
 
 POST isteği genellikle veri ekleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
 
-```text
+```php
 <?php
 $cevap = $client->post('http://httpbin.org/post');
 ```
@@ -84,7 +84,7 @@ $cevap = $client->post('http://httpbin.org/post');
 
 GET isteği ise adından da anlaşıldığı üzere veri alma işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
 
-```text
+```php
 <?php
 $cevap = $client->get('http://httpbin.org/get');
 ```
@@ -93,7 +93,7 @@ $cevap = $client->get('http://httpbin.org/get');
 
 PUT isteği genellikle veri güncelleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
 
-```text
+```php
 <?php
 $cevap = $client->put('http://httpbin.org/put');
 ```
@@ -102,7 +102,7 @@ $cevap = $client->put('http://httpbin.org/put');
 
 DELETE isteği ise adından da anlaşıldığı üzere veri silme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
 
-```text
+```php
 <?php
 $cevap = $client->delete('http://httpbin.org/delete');
 ```
@@ -111,7 +111,7 @@ $cevap = $client->delete('http://httpbin.org/delete');
 
 PATCH isteği genellikle veri güncelleme işlemlerinde kullanılır. Bu isteği örnekteki gibi kullanabilirsiniz.
 
-```text
+```php
 <?php
 $cevap = $client->patch('http://httpbin.org/patch');
 ```
@@ -120,7 +120,7 @@ $cevap = $client->patch('http://httpbin.org/patch');
 
 Base URL tanımlamak, istek adresini her defasında uzun uzun girmekten kurtarır.
 
-```text
+```php
 <?php
 
 $client = new Client([
@@ -130,7 +130,7 @@ $client = new Client([
 
 ### Cevap durum kodu öğrenme
 
-```text
+```php
 <?php
 
 $cevap = $client->get('http://httpbin.org/get');
