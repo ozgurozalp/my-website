@@ -78,10 +78,10 @@ export default function Page() {
                 </p>
                 <p>
                   Outside of work, I believe in leading a fulfilling and
-                  balanced life. I spend quality time with my girlfriend Zeynep,
-                  engaging in creative discussions and enjoying the little joys
-                  of life. I’m based in Istanbul and prefer working remotely
-                  while striving to push the boundaries of technology.
+                  balanced life. I spend quality time with my friends, engaging
+                  in creative discussions and enjoying the little joys of life.
+                  I’m based in Istanbul and prefer working remotely while
+                  striving to push the boundaries of technology.
                 </p>
                 <p>
                   If you’d like to learn more about my projects or collaborate

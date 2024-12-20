@@ -78,10 +78,10 @@ export default function Page() {
                 </p>
                 <p>
                   Aynı zamanda romantik ve keyifli bir hayata inanıyor, iş
-                  dışında ise zamanımı kız arkadaşım Zeynep ile geçiriyor,
-                  yaratıcı fikirler üzerine sohbet etmeyi seviyorum.
-                  İstanbul&apos;da olup uzaktan çalışma modelini tercih ediyor
-                  ve teknolojiyle sınırları zorlamayı hedefliyorum.
+                  dışında ise zamanımı arkadaşlarım ile geçiriyor, yaratıcı
+                  fikirler üzerine sohbet etmeyi seviyorum. İstanbul&apos;da
+                  olup uzaktan çalışma modelini tercih ediyor ve teknolojiyle
+                  sınırları zorlamayı hedefliyorum.
                 </p>
                 <p>
                   Eğer projelerimle ilgili bilgi almak veya benimle çalışmak
