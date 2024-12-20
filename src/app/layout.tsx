@@ -12,8 +12,8 @@ const poppins = Poppins({
 });
 
 const title = "Özgür ÖZALP - Full Stack Developer";
-const description =
-  "Özgür ÖZALP is a Full Stack Developer based in Istanbul, TR.";
+// prettier-ignore
+const description = "Explore Özgür Özalp's world of software and technology projects, guides, and tips. Dive into topics like frontend and fullstack development, WordPress, React, Next.js, Tailwind CSS, and more.";
 
 export const metadata: Metadata = {
   title,
@@ -32,7 +32,6 @@ export const metadata: Metadata = {
     "ozgur ozalp",
     "ozgur",
     "ozalp",
-    "ozqurozalp.com",
     "ozgurozalp.com",
     "Frontend Developer",
     "Backend Developer",
@@ -40,6 +39,16 @@ export const metadata: Metadata = {
     "Software Developer",
     "JavaScript Developer",
     "TypeScript Developer",
+    "Özgür Özalp",
+    "Software Development",
+    "Frontend Developer",
+    "Fullstack Development",
+    "React.js Projects",
+    "Next.js Tutorials",
+    "WordPress with Docker",
+    "Tailwind CSS Tips",
+    "Technology Blog",
+    "Remote Work in Istanbul",
   ],
   creator: "Özgür ÖZALP",
   publisher: "Özgür ÖZALP",
