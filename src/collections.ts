@@ -14,7 +14,7 @@ const frontmatterSchema = z.object({
     name: z.string(),
     title: z.string(),
     url: z.string().url(),
-    avatar: z.string().url(),
+    avatar: z.string().url().or(z.string()),
   }),
 });
 
