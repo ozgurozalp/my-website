@@ -31,6 +31,11 @@ export default withMDX({
         destination: "/blog/category/:slug",
         permanent: true,
       },
+      {
+        source: "/about/:slug",
+        destination: "/about",
+        permanent: true,
+      },
       ...oldBLogs.map((oldBlog) => ({
         source: oldBlog,
         destination: "/blog" + oldBlog,
