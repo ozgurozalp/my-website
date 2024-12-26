@@ -71,7 +71,8 @@ export const metadata: Metadata = {
     title,
     description,
     card: "summary_large_image",
-    site: "https://ozgurozalp.com",
+    site: "@ozqurozalp",
+    creator: "@ozqurozalp",
   },
 };
 
