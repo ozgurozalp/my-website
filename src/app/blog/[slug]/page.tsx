@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import * as fs from "node:fs/promises";
 import { MDXContent } from "renoun/components";
 import { remarkPlugins } from "renoun/mdx";
-import { useMDXComponents } from "@/mdx-components";
+import { components } from "@/mdx-components";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -58,9 +58,6 @@ export default async function Page({ params }: Props) {
   const Content = await post.getExportValueOrThrow("default");
 
   const content = await fs.readFile(post.getAbsolutePath(), "utf-8");
-  const components = useMDXComponents();
-
-  console.log("content", removeFrontMatter(content));
 
   return (
     <article>
