@@ -4,6 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 @layer base {
   :root {
     --header-height: 4.5rem;
@@ -206,4 +207,8 @@
   &.active .bottom {
     stroke-dashoffset: -64px;
   }
+}
+
+* {
+  scroll-behavior: smooth;
 }

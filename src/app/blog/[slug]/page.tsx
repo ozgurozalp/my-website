@@ -2,6 +2,10 @@ import { dateFormat, getParentMetadata } from "@/lib/utils";
 import { Metadata, ResolvingMetadata } from "next";
 import { posts } from "@/collections";
 import { notFound } from "next/navigation";
+import * as fs from "node:fs/promises";
+import { MDXContent } from "renoun/components";
+import { remarkPlugins } from "renoun/mdx";
+import { useMDXComponents } from "@/mdx-components";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -12,7 +16,6 @@ export async function generateStaticParams() {
   const allPosts = await posts.getEntries();
   return allPosts.map((post) => ({ slug: post.getName() }));
 }
-
 
 export async function generateMetadata(
   { params }: Props,
@@ -54,6 +57,11 @@ export default async function Page({ params }: Props) {
   const frontMatter = await post.getExportValueOrThrow("frontmatter");
   const Content = await post.getExportValueOrThrow("default");
 
+  const content = await fs.readFile(post.getAbsolutePath(), "utf-8");
+  const components = useMDXComponents();
+
+  console.log("content", removeFrontMatter(content));
+
   return (
     <article>
       <div className="flex flex-col">
@@ -83,7 +91,11 @@ export default async function Page({ params }: Props) {
                 alt={frontMatter.title}
               />
               <div className="prose p-4 sm:p-10 max-w-full prose-gray transition-all prose-headings:relative prose-headings:scroll-mt-20 prose-headings:font-display prose-headings:font-bold">
-                <Content />
+                <MDXContent
+                  remarkPlugins={remarkPlugins}
+                  components={components}
+                  value={content}
+                />
               </div>
             </div>
             <div className="sticky top-16 lg:top-1 col-span-1 hidden flex-col divide-y divide-gray-200 self-start sm:flex">
@@ -119,4 +131,9 @@ export default async function Page({ params }: Props) {
       </div>
     </article>
   );
+}
+
+function removeFrontMatter(markdown: string) {
+  const frontMatterRegex = /^---[\s\S]*?---[\r\n]+/;
+  return markdown.replace(frontMatterRegex, "").trimStart();
 }
