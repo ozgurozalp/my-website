@@ -1,0 +1,229 @@
+---
+title: Laravel Nedir ve Nasıl Kullanılır?
+description: Bu yazıda, Laravel framework’ünün ne olduğunu, neden tercih edildiğini ve Windows veya macOS üzerinde nasıl kurulum yapabileceğinizi anlatacağım. Adım adım kurulum ve kullanım örnekleriyle birlikte, detaylı bir rehber sunmaya çalışacağım.
+createdAt: 2025-01-16
+updatedAt: 2025-01-16
+coverImage: /images/laravel-nedir.jpg
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - php
+tags:
+  - laravel
+  - framework
+  - macos
+  - windows
+---
+
+## **İçindekiler**
+1. [Laravel Nedir?](#laravel-nedir)
+2. [Neden Laravel?](#neden-laravel)
+3. [Kurulum Öncesi Gereksinimler](#kurulum-öncesi-gereksinimler)
+- [Windows için Gereksinimler](#windows-icin-gereksinimler)
+- [macOS için Gereksinimler](#macos-icin-gereksinimler)
+4. [Windows’ta Laravel Kurulumu](#windows-ta-laravel-kurulumu)
+5. [macOS’te Laravel Kurulumu](#macos-te-laravel-kurulumu)
+6. [İlk Laravel Projesi Oluşturma](#ilk-laravel-projesi-olusturma)
+7. [Laravel Proje Yapısı](#laravel-proje-yapisi)
+8. [Örnek Bir Routes ve Controller Kullanımı](#ornek-bir-routes-ve-controller-kullanimi)
+9. [Sonuç](#sonuc)
+
+---
+
+## **Laravel Nedir?**
+[Laravel](https://laravel.com/) **PHP** dilinde yazılmış, açık kaynak kodlu bir **web uygulama** çatısı (framework)dır. Model-View-Controller (MVC) mimarisini kullanarak, özellikle orta ve büyük ölçekli projeleri yönetmeyi ve geliştirmeyi kolaylaştırır. `Blade` isimli şablon motoru, `Eloquent` isimli ORM yapısı ve kolayca entegrasyon sağlayan paket yapıları sayesinde popülerliğini korumaktadır.
+
+## **Neden Laravel?**
+- **MVC Mimarisi**: Kodları düzenli tutmak ve takım içi işbirliğini kolaylaştırmak için ideal.
+- **Kapsamlı Dokümantasyon**: Laravel’in çevrimiçi dokümantasyonu oldukça kapsamlı ve anlaşılır.
+- **Eloquent ORM**: Veritabanı işlemlerini nesne yönelimli bir şekilde yönetmeyi sağlar.
+- **Blade Şablon Motoru**: Hızlı ve temiz bir şekilde HTML şablonlarını yönetmeye yarar.
+- **Güvenlik & Yetkilendirme**: Laravel, kullanıcı yetkilendirme ve giriş-çıkış işlemlerini kolayca sağlayan güvenlik katmanlarına sahiptir.
+- **Topluluk Desteği**: Büyük bir geliştirici topluluğu vardır ve pek çok hazır paket bulunmaktadır.
+
+## **Kurulum Öncesi Gereksinimler**
+Laravel’i kurmadan önce bazı araçların makinenizde yüklü olması gerekir.
+
+### **Windows için Gereksinimler**
+1. **PHP** (En az 8.0 veya üstü önerilir)
+2. **Composer** (PHP paket yöneticisi)
+3. **Web Sunucusu** (örneğin [XAMPP](https://www.apachefriends.org/), [WAMP](http://www.wampserver.com/))
+4. **MySQL** veya başka bir veritabanı yönetim sistemi (Ör: PostgreSQL, SQLite)
+
+> Eğer XAMPP veya WAMP gibi bir paket kurarsanız, PHP ve MySQL otomatik olarak gelir.
+
+### **macOS için Gereksinimler**
+1. **PHP** (macOS üzerinde genellikle varsayılan olarak bulunur, ancak versiyona dikkat etmek gerekir)
+2. **Composer** (Homebrew ile kolayca kurulabilir)
+3. **MySQL** veya başka bir veritabanı yönetim sistemi (Ör: PostgreSQL)
+
+> macOS kullanıcıları **[Homebrew](https://brew.sh/)** kullanarak çoğu aracı tek komutla kurabilir.
+
+---
+
+## **Windows’ta Laravel Kurulumu**
+1. **Composer Kurulumu**
+- [Composer](https://getcomposer.org/download/) resmi sayfasından .exe dosyasını indirerek kurun.
+- Kurulum sırasında, PHP yolunu göstermeniz gerekebilir. XAMPP kuruluysa, genellikle `C:\xampp\php\php.exe` yolunu seçeceksiniz.
+
+2. **Laravel’i Kurmak**
+- Komut satırını (`cmd` veya `PowerShell`) açın.
+- Aşağıdaki komut ile Laravel Installer’ı yükleyebilirsiniz:
+```bash
+composer global require laravel/installer
+     ```
+- Sonrasında, `PATH` ortam değişkenine `C:\Users\KullanıcıAdı\AppData\Roaming\Composer\vendor\bin` yolunu eklediğinizden emin olun.
+
+3. **Yeni Bir Proje Oluşturmak**
+- Laravel Installer yüklendiyse:
+```bash
+laravel new blog
+     ```
+- Eğer direkt `create-project` komutunu kullanmak isterseniz:
+```bash
+composer create-project laravel/laravel blog
+     ```
+- Bu komutlar, `blog` adında bir klasör oluşturur ve Laravel dosyalarını otomatik olarak indirir.
+
+4. **Projenin Çalıştırılması**
+- Proje dizinine girerek **Artisan** servisini başlatabilirsiniz:
+```bash
+cd blog
+php artisan serve
+     ```
+- [http://localhost:8000](http://localhost:8000) adresinden uygulamanıza erişebilirsiniz.
+
+---
+
+## **macOS’te Laravel Kurulumu**
+1. **Homebrew İle Gerekli Araçların Kurulumu**
+- Terminali açın ve Homebrew kurulu değilse, resmi sitedeki komutla kurun.
+- PHP ve Composer’ı yükleyin:
+```bash
+brew install php composer
+     ```
+
+2. **Laravel’i Kurmak**
+- Tıpkı Windows’ta yaptığınız gibi, Laravel Installer’ı global olarak yükleyebilirsiniz:
+```bash
+composer global require laravel/installer
+     ```
+- Ardından, `~/.composer/vendor/bin` yolunu `PATH` değişkeninize ekleyin (Zsh veya Bash yapılandırmanızda).
+- Örnek Zsh ayarı için `~/.zshrc` dosyasına şunu ekleyebilirsiniz:
+```bash
+export PATH="$HOME/.composer/vendor/bin:$PATH"
+     ```
+
+3. **Yeni Bir Proje Oluşturmak**
+- Laravel Installer kullanarak:
+```bash
+laravel new blog
+     ```
+- Ya da create-project komutu ile:
+```bash
+composer create-project laravel/laravel blog
+     ```
+
+4. **Projenin Çalıştırılması**
+- Proje klasörüne girin ve Artisan servisini başlatın:
+```bash
+cd blog
+php artisan serve
+     ```
+- [http://127.0.0.1:8000](http://127.0.0.1:8000) adresinden projeyi görebilirsiniz.
+
+---
+
+## **İlk Laravel Projesi Oluşturma**
+Hem Windows hem de macOS’te izleyeceğiniz yol aynıdır. Aşağıdaki adımları tamamlayarak ilk projenizi çalışır hale getirebilirsiniz:
+
+1. **Proje Klasörüne Girin**
+```bash
+cd blog
+   ```
+2. **.env Dosyasını Yapılandırın**
+- `blog/.env` dosyasını açın ve `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` gibi veritabanı bilgilerinizi güncelleyin.
+3. **Veritabanı Migrasyonlarını Çalıştırın**
+```bash
+php artisan migrate
+   ```
+- Böylece varsayılan kullanıcı tablosu ve diğer tablolar oluşturulur.
+4. **Sunucuyu Başlatın**
+```bash
+php artisan serve
+   ```
+- Tarayıcıda [http://localhost:8000](http://localhost:8000) adresini açarak projenizi görebilirsiniz.
+
+---
+
+## **Laravel Proje Yapısı**
+Laravel projelerinin temel klasörleri şunlardır:
+- **app**: Uygulamanın temel PHP sınıflarını barındırır (Models, Controllers vb.).
+- **bootstrap**: Uygulama ile ilgili başlatma dosyalarını içerir.
+- **config**: Yapılandırma (config) dosyaları bulunur.
+- **database**: Veritabanı migrasyonları ve seed dosyaları burada yer alır.
+- **public**: Projenizin ana giriş noktası (`index.php`) ve genel dosyalar (CSS, JS, resimler) bu klasördedir.
+- **resources**: Blade şablonları, SASS/LESS dosyaları, Vue/React kaynak dosyaları gibi kaynaklar burada.
+- **routes**: Rotalarınızın tanımlandığı dosyalar (örneğin `web.php`).
+- **tests**: Test dosyaları bulunur (PHPUnit).
+- **vendor**: Composer ile yüklenen tüm harici bağımlılıkların bulunduğu klasör.
+
+---
+
+## **Örnek Bir Routes ve Controller Kullanımı**
+Örnek olarak, kullanıcı karşılama sayfası (home sayfası) yapalım:
+
+### **1. Route Tanımı**
+`routes/web.php` dosyasında aşağıdaki gibi bir rota tanımlayabilirsiniz:
+```php
+Route::get('/', [App\Http\Controllers\HomeController::class, 'index']);
+```
+
+### **2. Controller Oluşturma**
+Terminalden `php artisan make:controller HomeController` komutu ile `app/Http/Controllers` klasörü içinde `HomeController` oluşur. Ardından:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class HomeController extends Controller
+{
+    public function index()
+    {
+        // İlgili veritabanı işlemleri veya veri hazırlığı yapılır
+        // Sonra bir Blade sayfası döndürülür
+        return view('home');
+    }
+}
+```
+
+### **3. View (Blade) Oluşturma**
+`resources/views` klasöründe `home.blade.php` adında bir dosya oluşturun ve içine basit bir HTML ekleyin:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Laravel Home Page</title>
+</head>
+<body>
+    <h1>Hoş geldiniz!</h1>
+    <p>Laravel ile ilk projenize giriş yaptınız.</p>
+</body>
+</html>
+```
+
+Artık [http://localhost:8000](http://localhost:8000) adresine girdiğinizde bu sayfayı görmeniz gerekir.
+
+---
+
+## **Sonuç**
+Laravel, modern web projeleri geliştirmek için güçlü bir PHP çatısıdır. Geniş ekosistemi, zengin dökümantasyonu ve güçlü topluluğu sayesinde uygulama geliştirirken hem hızlı hem de verimli olmanızı sağlar. Bu rehberde, Laravel’i Windows veya macOS ortamında nasıl kuracağınızı ve basit bir proje oluşturmayı gösterdik. Daha gelişmiş konular (ORM ilişkileri, API oluşturma, test yazma vb.) için de Laravel dokümantasyonuna göz atabilirsiniz.
+
+Umarım bu rehber, Laravel’e yeni başlayanlar için faydalı olmuştur. Kolay gelsin ve iyi kodlamalar!

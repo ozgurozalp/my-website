@@ -13,12 +13,15 @@ export async function generateStaticParams() {
   return allPosts.map((post) => ({ slug: post.getName() }));
 }
 
+
 export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata,
 ): Promise<Metadata> {
   const prevMetadata = await getParentMetadata(parent);
-  const post = await posts.getFileOrThrow((await params).slug, "mdx");
+  const post = await posts.getFile((await params).slug, "mdx");
+  if (!post) return prevMetadata;
+
   const frontmatter = await post.getExportValueOrThrow("frontmatter");
   const title = frontmatter.title;
 
