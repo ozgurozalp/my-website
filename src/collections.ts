@@ -1,5 +1,4 @@
-import { Directory, isFile } from "renoun/file-system";
-import type { MDXContent } from "renoun/mdx";
+import { Directory, withSchema } from "renoun/file-system";
 import { z } from "zod";
 
 const frontmatterSchema = z.object({
@@ -18,20 +17,19 @@ const frontmatterSchema = z.object({
   }),
 });
 
-interface PostType {
-  default: MDXContent;
-  frontmatter: z.infer<typeof frontmatterSchema>;
-}
-
-export const posts = new Directory<{ mdx: PostType }>({
+export const posts = new Directory({
   path: "src/posts",
-})
-  .withSchema("mdx", { frontmatter: frontmatterSchema.parse })
-  .withModule((path) => import(`./posts/${path}`))
-  .withFilter((entry) => isFile(entry, "mdx"))
-  .withSort(async (a, b) => {
-    const aFrontmatter = await a.getExportValueOrThrow("frontmatter");
-    const bFrontmatter = await b.getExportValueOrThrow("frontmatter");
+  include: "*.mdx",
+  loaders: {
+    mdx: withSchema(
+      { frontmatter: frontmatterSchema },
+      (path) => import(`./posts/${path}.mdx`),
+    ),
+  },
+  sort: async (a, b) => {
+    const aFrontmatter = await a.getExportValue("frontmatter");
+    const bFrontmatter = await b.getExportValue("frontmatter");
 
     return bFrontmatter.createdAt.getTime() - aFrontmatter.createdAt.getTime();
-  });
+  },
+});

@@ -3,7 +3,7 @@ import { Metadata, ResolvingMetadata } from "next";
 import { posts } from "@/collections";
 import { notFound } from "next/navigation";
 import * as fs from "node:fs/promises";
-import { MDXContent } from "renoun/components";
+import { MDXRenderer } from "renoun/components";
 import { remarkPlugins } from "renoun/mdx";
 import { components } from "@/mdx-components";
 
@@ -88,7 +88,7 @@ export default async function Page({ params }: Props) {
                 alt={frontMatter.title}
               />
               <div className="prose p-4 sm:p-10 max-w-full prose-gray transition-all prose-headings:relative prose-headings:scroll-mt-20 prose-headings:font-display prose-headings:font-bold">
-                <MDXContent
+                <MDXRenderer
                   remarkPlugins={remarkPlugins}
                   components={components}
                   value={content}
