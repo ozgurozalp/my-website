@@ -9,7 +9,7 @@ interface BlogCardProps {
 
 export default async function BlogCard({ blog, className }: BlogCardProps) {
   const path = blog.getPath();
-  const frontMatter = await blog.getExportValueOrThrow("frontmatter");
+  const frontMatter = await blog.getExportValue("frontmatter");
   const url = `/blog${path}`;
 
   return (

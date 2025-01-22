@@ -23,12 +23,13 @@ export const posts = new Directory({
   loaders: {
     mdx: withSchema(
       { frontmatter: frontmatterSchema },
-      (path) => import(`./posts/${path}.mdx`),
+      (path) => import(`@/posts/${path}.mdx`),
     ),
   },
   sort: async (a, b) => {
     const aFrontmatter = await a.getExportValue("frontmatter");
     const bFrontmatter = await b.getExportValue("frontmatter");
+
 
     return bFrontmatter.createdAt.getTime() - aFrontmatter.createdAt.getTime();
   },

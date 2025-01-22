@@ -8,7 +8,7 @@ interface BlogListProps {
 }
 
 async function getPostWithCategory(blog: Blog) {
-  const frontMatter = await blog.getExportValueOrThrow("frontmatter");
+  const frontMatter = await blog.getExportValue("frontmatter");
   // @ts-ignore
   blog.categories = frontMatter?.categories ?? [];
   return blog as BlogWithCategory;

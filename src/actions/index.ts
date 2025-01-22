@@ -6,7 +6,7 @@ export async function getCategories() {
   const categories = new Set<string>();
 
   for (let post of allPosts) {
-    const frontMatter = await post.getExportValueOrThrow("frontmatter");
+    const frontMatter = await post.getExportValue("frontmatter");
     for (let string of frontMatter.categories ?? []) {
       categories.add(string);
     }

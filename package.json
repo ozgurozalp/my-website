@@ -31,7 +31,7 @@
     "react-dom": "^19.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-mdx-frontmatter": "^5.0.0",
-    "renoun": "^7.9.0",
+    "renoun": "^8.0.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "usehooks-ts": "^3.1.0",

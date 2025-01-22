@@ -14,7 +14,7 @@ type Props = {
 
 export async function generateStaticParams() {
   const allPosts = await posts.getEntries();
-  return allPosts.map((post) => ({ slug: post.getName() }));
+  return allPosts.map((post) => ({ slug: post.getBaseName() }));
 }
 
 export async function generateMetadata(
@@ -25,7 +25,7 @@ export async function generateMetadata(
   const post = await posts.getFile((await params).slug, "mdx");
   if (!post) return prevMetadata;
 
-  const frontmatter = await post.getExportValueOrThrow("frontmatter");
+  const frontmatter = await post.getExportValue("frontmatter");
   const title = frontmatter.title;
 
   return {
@@ -54,9 +54,7 @@ export async function generateMetadata(
 export default async function Page({ params }: Props) {
   const post = await posts.getFile((await params).slug, "mdx");
   if (!post) return notFound();
-  const frontMatter = await post.getExportValueOrThrow("frontmatter");
-  const Content = await post.getExportValueOrThrow("default");
-
+  const frontMatter = await post.getExportValue("frontmatter");
   const content = await fs.readFile(post.getAbsolutePath(), "utf-8");
 
   return (
@@ -128,9 +126,4 @@ export default async function Page({ params }: Props) {
       </div>
     </article>
   );
-}
-
-function removeFrontMatter(markdown: string) {
-  const frontMatterRegex = /^---[\s\S]*?---[\r\n]+/;
-  return markdown.replace(frontMatterRegex, "").trimStart();
 }

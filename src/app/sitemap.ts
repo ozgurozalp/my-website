@@ -33,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const post of allPosts) {
     const path = post.getPath();
-    const frontMatter = await post.getExportValueOrThrow("frontmatter");
+    const frontMatter = await post.getExportValue("frontmatter");
 
     mainUrls.push({
       url: `https://ozgurozalp.com/blog${path}`,
