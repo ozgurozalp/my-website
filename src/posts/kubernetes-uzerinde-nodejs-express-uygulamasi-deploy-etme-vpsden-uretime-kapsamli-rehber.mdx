@@ -1,0 +1,1662 @@
+---
+title: "Kubernetes Üzerinde Node.js Express Uygulaması Deploy Etme: VPS'den Üretime Kapsamlı Rehber"
+description: Bu rehber, sıfırdan başlayarak bir VPS üzerinde Kubernetes cluster'ı kurup, Node.js Express uygulamanızı profesyonel bir şekilde deploy etmenizi sağlayacak. Üretim ortamına hazır bir yapı kuracağız.
+createdAt: 2025-06-10
+updatedAt: 2025-06-10
+coverImage: /images/kuburnetes-node.js-ozgurozalp.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - deno
+  - javascript
+  - node-js
+  - v8-engine
+---
+
+## İçindekiler
+1. [Giriş](#giriş)
+2. [Gereksinimler](#gereksinimler)
+3. [VPS Hazırlığı](#vps-hazırlığı)
+4. [Docker Kurulumu](#docker-kurulumu)
+5. [Kubernetes Kurulumu](#kubernetes-kurulumu)
+6. [Node.js Express Uygulaması Oluşturma](#nodejs-express-uygulaması-oluşturma)
+7. [Docker Image Oluşturma](#docker-image-oluşturma)
+8. [Kubernetes Manifest Dosyaları](#kubernetes-manifest-dosyaları)
+9. [Uygulama Deploy Etme](#uygulama-deploy-etme)
+10. [Load Balancer ve Ingress Yapılandırması](#load-balancer-ve-ingress-yapılandırması)
+11. [Monitoring ve Logging](#monitoring-ve-logging)
+12. [Güvenlik Ayarları](#güvenlik-ayarları)
+13. [Sorun Giderme](#sorun-giderme)
+14. [İleri Seviye Konular](#ileri-seviye-konular)
+
+## Giriş
+
+Bu rehber, sıfırdan başlayarak bir VPS üzerinde Kubernetes cluster'ı kurup, Node.js Express uygulamanızı profesyonel bir şekilde deploy etmenizi sağlayacak. Üretim ortamına hazır bir yapı kuracağız.
+
+## Gereksinimler
+
+### Donanım Gereksinimleri
+- **Minimum**: 2 CPU, 4GB RAM, 20GB SSD
+- **Önerilen**: 4 CPU, 8GB RAM, 50GB SSD
+- **Network**: En az 1Gbps bağlantı
+
+### Yazılım Gereksinimleri
+- Ubuntu 20.04 LTS veya 22.04 LTS
+- Root veya sudo yetkisi
+- SSH erişimi
+- Domain adı (opsiyonel)
+
+## VPS Hazırlığı
+
+### 1. Sistem Güncellemesi
+
+```bash
+# Sistem paketlerini güncelle
+sudo apt update && sudo apt upgrade -y
+
+# Gerekli paketleri yükle
+sudo apt install -y curl wget apt-transport-https ca-certificates gnupg lsb-release
+```
+
+### 2. Güvenlik Duvarı Yapılandırması
+
+```bash
+# UFW'yi aktifleştir
+sudo ufw enable
+
+# Gerekli portları aç
+sudo ufw allow 22/tcp        # SSH
+sudo ufw allow 80/tcp        # HTTP
+sudo ufw allow 443/tcp       # HTTPS
+sudo ufw allow 6443/tcp      # Kubernetes API Server
+sudo ufw allow 2379:2380/tcp # etcd
+sudo ufw allow 10250/tcp     # Kubelet
+sudo ufw allow 10251/tcp     # kube-scheduler
+sudo ufw allow 10252/tcp     # kube-controller-manager
+sudo ufw allow 30000:32767/tcp # NodePort Services
+
+# Durumu kontrol et
+sudo ufw status
+```
+
+### 3. Swap'ı Devre Dışı Bırakma
+
+```bash
+# Swap'ı geçici olarak kapat
+sudo swapoff -a
+
+# Kalıcı olarak devre dışı bırak
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+# Kontrol et
+free -h
+```
+
+### 4. Sistem Optimizasyonları
+
+```bash
+# Kernel modüllerini yükle
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+# Sysctl parametrelerini ayarla
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+sudo sysctl --system
+```
+
+## Docker Kurulumu
+
+### 1. Docker Repository Ekleme
+
+```bash
+# Docker GPG anahtarını ekle
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Docker repository'sini ekle
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+### 2. Docker Kurulumu
+
+```bash
+# Paket listesini güncelle
+sudo apt update
+
+# Docker'ı yükle
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Docker servisini başlat ve etkinleştir
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Kullanıcıyı docker grubuna ekle
+sudo usermod -aG docker $USER
+
+# Yeni grup ayarlarını aktifleştir
+newgrp docker
+
+# Docker versiyonunu kontrol et
+docker --version
+```
+
+### 3. containerd Yapılandırması
+
+```bash
+# containerd'yi yapılandır
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+
+# SystemdCgroup'u etkinleştir
+sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
+# containerd'yi yeniden başlat
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+```
+
+## Kubernetes Kurulumu
+
+### 1. Kubernetes Repository Ekleme
+
+```bash
+# Kubernetes GPG anahtarını ekle
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+# Kubernetes repository'sini ekle
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+```
+
+### 2. Kubernetes Bileşenlerini Kurma
+
+```bash
+# Paket listesini güncelle
+sudo apt update
+
+# Kubernetes bileşenlerini yükle
+sudo apt install -y kubelet kubeadm kubectl
+
+# Otomatik güncellemeleri durdur
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# Kubelet'i etkinleştir
+sudo systemctl enable kubelet
+```
+
+### 3. Kubernetes Cluster'ını Başlatma
+
+```bash
+# Cluster'ı initialize et
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=$(hostname -I | cut -d' ' -f1)
+
+# kubectl yapılandırması
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Cluster durumunu kontrol et
+kubectl get nodes
+```
+
+### 4. CNI Network Plugin Kurulumu (Flannel)
+
+```bash
+# Flannel'i yükle
+kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# Pod'ların durumunu kontrol et
+kubectl get pods -n kube-flannel
+
+# Node'un Ready durumuna gelmesini bekle
+kubectl get nodes
+```
+
+### 5. Master Node'da Pod Çalıştırma (Tek Node Cluster için)
+
+```bash
+# Master node'daki taint'i kaldır
+kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+
+# Durumu kontrol et
+kubectl get nodes -o wide
+```
+
+## Node.js Express Uygulaması Oluşturma
+
+### 1. Proje Klasörü Oluşturma
+
+```bash
+# Proje klasörünü oluştur
+mkdir ~/nodejs-k8s-app
+cd ~/nodejs-k8s-app
+
+# package.json dosyasını oluştur
+cat > package.json << 'EOF'
+{
+  "name": "nodejs-k8s-app",
+  "version": "1.0.0",
+  "description": "Node.js Express app for Kubernetes deployment",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0"
+  },
+  "keywords": ["nodejs", "express", "kubernetes", "docker"],
+  "author": "Your Name",
+  "license": "MIT"
+}
+EOF
+```
+
+### 2. Express Uygulaması Oluşturma
+
+```bash
+# Ana uygulama dosyasını oluştur
+cat > app.js << 'EOF'
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(morgan('combined'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Node.js Express uygulaması Kubernetes üzerinde çalışıyor!',
+    timestamp: new Date().toISOString(),
+    hostname: require('os').hostname(),
+    version: '1.0.0'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/users', (req, res) => {
+  const users = [
+    { id: 1, name: 'Ahmet Yılmaz', email: 'ahmet@example.com' },
+    { id: 2, name: 'Ayşe Demir', email: 'ayse@example.com' },
+    { id: 3, name: 'Mehmet Kaya', email: 'mehmet@example.com' }
+  ];
+  res.json(users);
+});
+
+app.post('/api/users', (req, res) => {
+  const { name, email } = req.body;
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Name ve email gerekli' });
+  }
+
+  const newUser = {
+    id: Date.now(),
+    name,
+    email
+  };
+
+  res.status(201).json(newUser);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Bir şeyler ters gitti!' });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Sayfa bulunamadı' });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM alındı, sunucu kapatılıyor...');
+  server.close(() => {
+    console.log('Sunucu kapatıldı');
+    process.exit(0);
+  });
+});
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server ${PORT} portunda çalışıyor`);
+});
+
+module.exports = app;
+EOF
+```
+
+### 3. Bağımlılıkları Yükleme
+
+```bash
+# Node.js ve npm yükle
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Proje bağımlılıklarını yükle
+npm install
+
+# Uygulamayı test et
+npm start
+```
+
+## Docker Image Oluşturma
+
+### 1. Dockerfile Oluşturma
+
+```bash
+cat > Dockerfile << 'EOF'
+# Multi-stage build
+FROM node:18-alpine AS builder
+
+# Güvenlik için root olmayan kullanıcı oluştur
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Çalışma dizinini ayarla
+WORKDIR /app
+
+# Package dosyalarını kopyala
+COPY package*.json ./
+
+# Bağımlılıkları yükle
+RUN npm ci --only=production && npm cache clean --force
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Güvenlik güncellemeleri
+RUN apk update && apk upgrade && apk add --no-cache dumb-init
+
+# Root olmayan kullanıcı oluştur
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Çalışma dizinini ayarla
+WORKDIR /app
+
+# Node_modules'ü builder'dan kopyala
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+
+# Uygulama dosyalarını kopyala
+COPY --chown=nodejs:nodejs . .
+
+# Port'u expose et
+EXPOSE 3000
+
+# Kullanıcıyı değiştir
+USER nodejs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+
+# Uygulamayı başlat
+CMD ["dumb-init", "node", "app.js"]
+EOF
+```
+
+### 2. .dockerignore Dosyası
+
+```bash
+cat > .dockerignore << 'EOF'
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.vscode
+.DS_Store
+*.log
+EOF
+```
+
+### 3. Docker Image Build Etme
+
+```bash
+# Image'i build et
+docker build -t nodejs-k8s-app:v1.0.0 .
+
+# Image'i kontrol et
+docker images | grep nodejs-k8s-app
+
+# Image'i test et
+docker run -d -p 3000:3000 --name test-app nodejs-k8s-app:v1.0.0
+
+# Test
+curl http://localhost:3000
+
+# Container'ı durdur ve sil
+docker stop test-app && docker rm test-app
+```
+
+## Kubernetes Manifest Dosyaları
+
+### 1. Namespace Oluşturma
+
+```bash
+cat > k8s/namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nodejs-app
+  labels:
+    name: nodejs-app
+    app: nodejs-k8s-app
+EOF
+```
+
+### 2. ConfigMap Oluşturma
+
+```bash
+mkdir -p k8s
+
+cat > k8s/configmap.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nodejs-app-config
+  namespace: nodejs-app
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  APP_NAME: "nodejs-k8s-app"
+  LOG_LEVEL: "info"
+EOF
+```
+
+### 3. Secret Oluşturma
+
+```bash
+cat > k8s/secret.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nodejs-app-secret
+  namespace: nodejs-app
+type: Opaque
+data:
+  # Base64 encoded values
+  # echo -n "your-secret-key" | base64
+  SECRET_KEY: eW91ci1zZWNyZXQta2V5
+  # echo -n "your-db-password" | base64
+  DB_PASSWORD: eW91ci1kYi1wYXNzd29yZA==
+EOF
+```
+
+### 4. Deployment Oluşturma
+
+```bash
+cat > k8s/deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app-deployment
+  namespace: nodejs-app
+  labels:
+    app: nodejs-k8s-app
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: nodejs-k8s-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-k8s-app
+        version: v1.0.0
+    spec:
+      containers:
+      - name: nodejs-app
+        image: nodejs-k8s-app:v1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: nodejs-app-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: nodejs-app-config
+              key: PORT
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nodejs-app-secret
+              key: SECRET_KEY
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 1001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-app-service
+  namespace: nodejs-app
+  labels:
+    app: nodejs-k8s-app
+spec:
+  type: ClusterIP
+  selector:
+    app: nodejs-k8s-app
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+EOF
+```
+
+### 5. HorizontalPodAutoscaler
+
+```bash
+cat > k8s/hpa.yaml << 'EOF'
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nodejs-app-hpa
+  namespace: nodejs-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nodejs-app-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+EOF
+```
+
+## Uygulama Deploy Etme
+
+### 1. Kubernetes Dashboard Kurulumu (Opsiyonel)
+
+```bash
+# Dashboard'u yükle
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+
+# Admin user oluştur
+cat > k8s/dashboard-admin.yaml << 'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+EOF
+
+kubectl apply -f k8s/dashboard-admin.yaml
+
+# Token al
+kubectl -n kubernetes-dashboard create token admin-user
+```
+
+### 2. Uygulamayı Deploy Etme
+
+```bash
+# Tüm manifest'leri uygula
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+
+# Deployment ve Service'i deploy et
+kubectl apply -f k8s/deployment.yaml
+
+# HPA'yı etkinleştir (Metrics Server gerekli)
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Metrics Server'ı düzelt (self-signed sertifika için)
+kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+
+# HPA'yı uygula
+kubectl apply -f k8s/hpa.yaml
+```
+
+### 3. Deploy Durumunu Kontrol Etme
+
+```bash
+# Pod'ları kontrol et
+kubectl get pods -n nodejs-app -o wide
+
+# Service'leri kontrol et
+kubectl get svc -n nodejs-app
+
+# Deployment durumunu kontrol et
+kubectl get deployment -n nodejs-app
+
+# HPA durumunu kontrol et
+kubectl get hpa -n nodejs-app
+
+# Pod loglarını kontrol et
+kubectl logs -f deployment/nodejs-app-deployment -n nodejs-app
+
+# Pod içine bağlan
+kubectl exec -it deployment/nodejs-app-deployment -n nodejs-app -- /bin/sh
+```
+
+## Load Balancer ve Ingress Yapılandırması
+
+### 1. NGINX Ingress Controller Kurulumu
+
+```bash
+# NGINX Ingress Controller'ı yükle
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/baremetal/deploy.yaml
+
+# NodePort olarak çalıştığını kontrol et
+kubectl get svc -n ingress-nginx
+
+# Ingress Controller pod'larını kontrol et
+kubectl get pods -n ingress-nginx
+```
+
+### 2. Ingress Resource Oluşturma
+
+```bash
+cat > k8s/ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nodejs-app-ingress
+  namespace: nodejs-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: your-domain.com  # Kendi domain'inizi yazın
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nodejs-app-service
+            port:
+              number: 80
+  - host: nodejs-app.local  # Local test için
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nodejs-app-service
+            port:
+              number: 80
+EOF
+
+kubectl apply -f k8s/ingress.yaml
+```
+
+### 3. SSL/TLS Sertifikası (Let's Encrypt)
+
+```bash
+# Cert-manager yükle
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
+
+# ClusterIssuer oluştur
+cat > k8s/cluster-issuer.yaml << 'EOF'
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # Email'inizi yazın
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
+
+kubectl apply -f k8s/cluster-issuer.yaml
+
+# SSL'li Ingress güncelle
+cat > k8s/ingress-ssl.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nodejs-app-ingress-ssl
+  namespace: nodejs-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - your-domain.com
+    secretName: nodejs-app-tls
+  rules:
+  - host: your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nodejs-app-service
+            port:
+              number: 80
+EOF
+
+kubectl apply -f k8s/ingress-ssl.yaml
+```
+
+## Monitoring ve Logging
+
+### 1. Prometheus ve Grafana Kurulumu
+
+```bash
+# Helm yükle
+curl https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz -o helm.tar.gz
+tar -zxvf helm.tar.gz
+sudo mv linux-amd64/helm /usr/local/bin/helm
+
+# Prometheus Helm repository ekle
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Prometheus stack'i yükle
+kubectl create namespace monitoring
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --set grafana.adminPassword=admin123
+
+# Grafana'ya erişim için port forward
+kubectl port-forward -n monitoring svc/prometheus-grafana 3001:80 --address='0.0.0.0' &
+```
+
+### 2. Elasticsearch, Fluentd, Kibana (EFK) Stack
+
+```bash
+# Logging namespace oluştur
+kubectl create namespace logging
+
+# Elasticsearch deploy et
+cat > k8s/elasticsearch.yaml << 'EOF'
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: logging
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+        ports:
+        - containerPort: 9200
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        resources:
+          requests:
+            memory: 1Gi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+spec:
+  selector:
+    app: elasticsearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+EOF
+
+kubectl apply -f k8s/elasticsearch.yaml
+```
+
+## Güvenlik Ayarları
+
+### 1. Network Policies
+
+```bash
+# Network Policy oluştur
+cat > k8s/network-policy.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nodejs-app-network-policy
+  namespace: nodejs-app
+spec:
+  podSelector:
+    matchLabels:
+      app: nodejs-k8s-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: nodejs-k8s-app
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+EOF
+
+kubectl apply -f k8s/network-policy.yaml
+```
+
+### 2. Pod Security Policy
+
+```bash
+cat > k8s/pod-security-policy.yaml << 'EOF'
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: nodejs-app-psp
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nodejs-app-psp-user
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - nodejs-app-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nodejs-app-psp-binding
+roleRef:
+  kind: ClusterRole
+  name: nodejs-app-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: nodejs-app
+EOF
+
+kubectl apply -f k8s/pod-security-policy.yaml
+```
+
+### 3. RBAC (Role-Based Access Control)
+
+```bash
+cat > k8s/rbac.yaml << 'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nodejs-app-sa
+  namespace: nodejs-app
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: nodejs-app
+  name: nodejs-app-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nodejs-app-rolebinding
+  namespace: nodejs-app
+subjects:
+- kind: ServiceAccount
+  name: nodejs-app-sa
+  namespace: nodejs-app
+roleRef:
+  kind: Role
+  name: nodejs-app-role
+  apiGroup: rbac.authorization.k8s.io
+EOF
+
+kubectl apply -f k8s/rbac.yaml
+```
+
+### 4. Security Context Güncellemesi
+
+```bash
+# Deployment'ta service account kullan
+kubectl patch deployment nodejs-app-deployment -n nodejs-app -p '{"spec":{"template":{"spec":{"serviceAccountName":"nodejs-app-sa"}}}}'
+```
+
+## Sorun Giderme
+
+### 1. Yaygın Sorunlar ve Çözümleri
+
+```bash
+# Pod'lar başlamıyor
+kubectl describe pods -n nodejs-app
+kubectl logs -f deployment/nodejs-app-deployment -n nodejs-app
+
+# Image pull hatası
+kubectl describe pod <pod-name> -n nodejs-app
+
+# Service erişim sorunu
+kubectl get endpoints -n nodejs-app
+kubectl port-forward svc/nodejs-app-service 8080:80 -n nodejs-app
+
+# Ingress çalışmıyor
+kubectl describe ingress nodejs-app-ingress -n nodejs-app
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
+
+# DNS çözümleme problemi
+kubectl run test-pod --image=busybox --rm -it --restart=Never -- nslookup nodejs-app-service.nodejs-app.svc.cluster.local
+
+# Resource yetersizliği
+kubectl top nodes
+kubectl top pods -n nodejs-app
+
+# Cluster durumu
+kubectl cluster-info
+kubectl get componentstatuses
+```
+
+### 2. Debug Komutları
+
+```bash
+# Detaylı pod bilgisi
+kubectl get pods -o wide -n nodejs-app
+
+# Pod içindeki process'ler
+kubectl exec -it <pod-name> -n nodejs-app -- ps aux
+
+# Pod'un IP'si
+kubectl get pod <pod-name> -n nodejs-app -o jsonpath='{.status.podIP}'
+
+# Service endpoints
+kubectl get ep -n nodejs-app
+
+# ConfigMap ve Secret içeriği
+kubectl get configmap nodejs-app-config -n nodejs-app -o yaml
+kubectl get secret nodejs-app-secret -n nodejs-app -o yaml
+
+# Events kontrolü
+kubectl get events -n nodejs-app --sort-by=.metadata.creationTimestamp
+
+# Resource kullanımı
+kubectl top pod -n nodejs-app
+kubectl describe node
+```
+
+### 3. Monitoring ve Alerting
+
+```bash
+# Prometheus sorguları
+curl http://localhost:9090/api/v1/query?query=up
+
+# Application metrics
+curl http://<pod-ip>:3000/metrics
+
+# Grafana dashboard import
+# Dashboard ID: 315 (Kubernetes cluster monitoring)
+# Dashboard ID: 1471 (Node Exporter Full)
+```
+
+## İleri Seviye Konular
+
+### 1. CI/CD Pipeline (GitHub Actions)
+
+```bash
+# .github/workflows/deploy.yml oluştur
+mkdir -p .github/workflows
+
+cat > .github/workflows/deploy.yml << 'EOF'
+name: Build and Deploy to Kubernetes
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: nodejs-k8s-app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Deploy to Kubernetes
+      env:
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      run: |
+        echo "$KUBE_CONFIG" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+        # Update image in deployment
+        kubectl set image deployment/nodejs-app-deployment \
+          nodejs-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n nodejs-app
+
+        # Wait for rollout
+        kubectl rollout status deployment/nodejs-app-deployment -n nodejs-app
+
+        # Verify deployment
+        kubectl get pods -n nodejs-app
+EOF
+```
+
+### 2. Helm Chart Oluşturma
+
+```bash
+# Helm chart oluştur
+helm create nodejs-k8s-app-chart
+
+# Chart.yaml güncelle
+cat > nodejs-k8s-app-chart/Chart.yaml << 'EOF'
+apiVersion: v2
+name: nodejs-k8s-app
+description: A Helm chart for Node.js Express application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - nodejs
+  - express
+  - kubernetes
+home: https://github.com/yourusername/nodejs-k8s-app
+sources:
+  - https://github.com/yourusername/nodejs-k8s-app
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
+EOF
+
+# Values.yaml özelleştir
+cat > nodejs-k8s-app-chart/values.yaml << 'EOF'
+replicaCount: 3
+
+image:
+  repository: nodejs-k8s-app
+  pullPolicy: IfNotPresent
+  tag: "v1.0.0"
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  capabilities:
+    drop:
+    - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: nodejs-app.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+config:
+  nodeEnv: production
+  port: 3000
+  appName: nodejs-k8s-app
+  logLevel: info
+
+secrets:
+  secretKey: "your-secret-key"
+  dbPassword: "your-db-password"
+EOF
+
+# Chart'ı deploy et
+helm install nodejs-app ./nodejs-k8s-app-chart -n nodejs-app --create-namespace
+
+# Chart'ı güncelle
+helm upgrade nodejs-app ./nodejs-k8s-app-chart -n nodejs-app
+
+# Chart'ı kaldır
+helm uninstall nodejs-app -n nodejs-app
+```
+
+### 3. Backup ve Disaster Recovery
+
+```bash
+# Velero ile backup
+kubectl apply -f https://github.com/vmware-tanzu/velero/releases/download/v1.11.0/00-prereqs.yaml
+
+# MinIO backend için backup location
+cat > k8s/backup-location.yaml << 'EOF'
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: kubernetes-backups
+    prefix: velero
+  config:
+    region: us-east-1
+    s3ForcePathStyle: "true"
+    s3Url: http://minio.default.svc.cluster.local:9000
+EOF
+
+# Backup oluştur
+velero backup create nodejs-app-backup --include-namespaces nodejs-app
+
+# Backup'ı geri yükle
+velero restore create nodejs-app-restore --from-backup nodejs-app-backup
+```
+
+### 4. Multi-Environment Setup
+
+```bash
+# Environment-specific overlay'ler
+mkdir -p k8s/overlays/{development,staging,production}
+
+# Base kustomization
+cat > k8s/base/kustomization.yaml << 'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- namespace.yaml
+- configmap.yaml
+- secret.yaml
+- deployment.yaml
+- hpa.yaml
+- ingress.yaml
+
+commonLabels:
+  app: nodejs-k8s-app
+
+images:
+- name: nodejs-k8s-app
+  newTag: v1.0.0
+EOF
+
+# Production overlay
+cat > k8s/overlays/production/kustomization.yaml << 'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+- ../../base
+
+patchesStrategicMerge:
+- deployment-patch.yaml
+- ingress-patch.yaml
+
+replicas:
+- name: nodejs-app-deployment
+  count: 5
+
+images:
+- name: nodejs-k8s-app
+  newTag: v1.0.0-prod
+EOF
+
+# Deploy production
+kubectl apply -k k8s/overlays/production
+```
+
+## Performans Optimizasyonu
+
+### 1. Resource Limits ve Requests
+
+```bash
+# Vertical Pod Autoscaler kurulumu
+git clone https://github.com/kubernetes/autoscaler.git
+cd autoscaler/vertical-pod-autoscaler/
+./hack/vpa-up.sh
+
+# VPA oluştur
+cat > k8s/vpa.yaml << 'EOF'
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: nodejs-app-vpa
+  namespace: nodejs-app
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nodejs-app-deployment
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: nodejs-app
+      maxAllowed:
+        cpu: 1
+        memory: 1Gi
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+EOF
+
+kubectl apply -f k8s/vpa.yaml
+```
+
+### 2. Pod Disruption Budget
+
+```bash
+cat > k8s/pdb.yaml << 'EOF'
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nodejs-app-pdb
+  namespace: nodejs-app
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: nodejs-k8s-app
+EOF
+
+kubectl apply -f k8s/pdb.yaml
+```
+
+### 3. Node Affinity ve Anti-Affinity
+
+```bash
+# Deployment'ta affinity ekle
+kubectl patch deployment nodejs-app-deployment -n nodejs-app -p '
+{
+  "spec": {
+    "template": {
+      "spec": {
+        "affinity": {
+          "podAntiAffinity": {
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "weight": 100,
+                "podAffinityTerm": {
+                  "labelSelector": {
+                    "matchExpressions": [
+                      {
+                        "key": "app",
+                        "operator": "In",
+                        "values": ["nodejs-k8s-app"]
+                      }
+                    ]
+                  },
+                  "topologyKey": "kubernetes.io/hostname"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+## Sonuç
+
+Bu rehber ile Kubernetes üzerinde Node.js Express uygulamanızı profesyonel bir şekilde deploy etmeyi öğrendiniz. Temel kurulumdan ileri seviye konulara kadar tüm aşamaları kapsayan bu rehber sayesinde:
+
+- ✅ VPS'inizi Kubernetes için hazırladınız
+- ✅ Docker containerization işlemini gerçekleştirdiniz
+- ✅ Kubernetes manifest dosyalarını oluşturdunuz
+- ✅ Monitoring ve logging sistemini kurdunuz
+- ✅ Güvenlik yapılandırmalarını uyguladınız
+- ✅ CI/CD pipeline'ını ayarladınız
+- ✅ Backup ve disaster recovery planını oluşturdunuz
+
+### Önemli Notlar
+
+1. **Güvenlik**: Production ortamında mutlaka TLS sertifikalarını, network policy'lerini ve RBAC'ı aktif edin
+2. **Monitoring**: Prometheus ve Grafana ile sistem durumunu sürekli izleyin
+3. **Backup**: Düzenli backup alın ve restore prosedürlerini test edin
+4. **Updates**: Kubernetes ve uygulama güncellemelerini düzenli olarak yapın
+5. **Scaling**: HPA ve VPA ile otomatik ölçeklendirmeyi aktif edin
+
+### Sonraki Adımlar
+
+- Service Mesh (Istio) entegrasyonu
+- Advanced monitoring (Jaeger tracing)
+- GitOps (ArgoCD) implementasyonu
+- Multi-cluster setup
+- Cost optimization stratejileri
+
+Bu rehber sürekli güncellenecek ve topluluk katkılarıyla geliştirilecektir. Sorularınız için GitHub issues kullanabilirsiniz.
+
+### 3. Uygulama Metrics'leri
+
+```bash
+# Express app'e prometheus metrics ekle
+npm install prom-client
+
+# app.js'e metrics ekle
+cat >> app.js << 'EOF'
+
+// Prometheus metrics
+const client = require('prom-client');
+const register = new client.Registry();
+
+// Default metrics
+client.collectDefaultMetrics({
+  app: 'nodejs-k8s-app',
+  timeout: 10000,
+  gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
+  register
+});
+
+// Custom metrics
+const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+  register
+});
+
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  buckets: [0.1, 0.5, 1, 2, 5],
+  register
+});
+
+// Middleware for metrics
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+
+    httpRequestsTotal.labels(req.method, req.route?.path || req.path, res.statusCode).inc();
+    httpRequestDuration.labels(req.method, req.route?.path || req.path, res.statusCode).observe(duration);
+  });
+
+  next();
+});
+
+// Metrics endpoint
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+EOF
+```
