@@ -46,7 +46,7 @@ export default withMDX({
   async headers() {
     return [
       {
-        source: '/(.*\\.(png|jpg|jpeg|gif|webp|svg|ico|avif))',
+        source: '/images/:path*\\.(png|jpg|jpeg|gif|webp|svg|ico|avif)',
         headers: [
           {
             key: 'Cache-Control',
@@ -55,14 +55,14 @@ export default withMDX({
         ],
       },
       {
-        source: '/images/(.*)',
+        source: '/:path*\\.(png|jpg|jpeg|gif|webp|svg|ico|avif)',
         headers: [
           {
             key: 'Cache-Control',
             value: 'public, max-age=86400, stale-while-revalidate=43200',
           },
         ],
-      },
+      }
     ]
   },
 });
