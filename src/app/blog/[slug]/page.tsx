@@ -5,6 +5,10 @@ import { notFound } from "next/navigation";
 import * as fs from "node:fs/promises";
 import { MDXRenderer } from "renoun/components";
 import { remarkPlugins } from "renoun/mdx";
+// renoun 8.14'ün remarkPlugins listesi artık remark-frontmatter içermiyor;
+// ham dosya içeriği MDXRenderer'a verildiği için frontmatter'ı burada
+// açıkça sökmezsek her yazının başında yaml bloğu metin olarak görünüyor.
+import remarkFrontmatter from "remark-frontmatter";
 import { components } from "@/mdx-components";
 
 type Props = {
@@ -87,7 +91,7 @@ export default async function Page({ params }: Props) {
               />
               <div className="prose p-4 sm:p-10 max-w-full prose-gray transition-all prose-headings:relative prose-headings:scroll-mt-20 prose-headings:font-display prose-headings:font-bold">
                 <MDXRenderer
-                  remarkPlugins={remarkPlugins}
+                  remarkPlugins={[remarkFrontmatter, ...remarkPlugins]}
                   components={components}
                 >
                   {content}
