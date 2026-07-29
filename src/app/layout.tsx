@@ -4,6 +4,7 @@ import { Poppins } from "next/font/google";
 import AppHeader from "@/components/shared/AppHeader";
 import { GoogleTagManager } from "@next/third-parties/google";
 import { getCategories } from "@/actions";
+import { JsonLd, siteGraph } from "@/components/shared/JsonLd";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -93,6 +94,7 @@ export default async function RootLayout({
     <html lang="en" className={poppins.className}>
       <head>
         <GoogleTagManager gtmId="GTM-KNSSMMKM" />
+        <JsonLd data={siteGraph} />
       </head>
       <body>
         <AppHeader categories={categories} />

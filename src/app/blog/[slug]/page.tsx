@@ -10,6 +10,7 @@ import { remarkPlugins } from "renoun/mdx";
 // açıkça sökmezsek her yazının başında yaml bloğu metin olarak görünüyor.
 import remarkFrontmatter from "remark-frontmatter";
 import { components } from "@/mdx-components";
+import { JsonLd, postGraph } from "@/components/shared/JsonLd";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -56,13 +57,26 @@ export async function generateMetadata(
 }
 
 export default async function Page({ params }: Props) {
-  const post = await posts.getFile((await params).slug, "mdx");
+  const slug = (await params).slug;
+  const post = await posts.getFile(slug, "mdx");
   if (!post) return notFound();
   const frontMatter = await post.getExportValue("frontmatter");
   const content = await fs.readFile(post.getAbsolutePath(), "utf-8");
 
   return (
     <article>
+      <JsonLd
+        data={postGraph({
+          slug,
+          title: frontMatter.title,
+          description: frontMatter.description,
+          coverImage: frontMatter.coverImage,
+          createdAt: frontMatter.createdAt,
+          updatedAt: frontMatter.updatedAt,
+          tags: frontMatter.tags,
+          categories: frontMatter.categories,
+        })}
+      />
       <div className="flex flex-col">
         <div className="container">
           <div className="flex flex-col gap-4 pt-4">
