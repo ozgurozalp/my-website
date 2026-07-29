@@ -1,0 +1,132 @@
+---
+title: ECMAScript 2026 ve 2027'de JavaScript'e Neler Geliyor?
+description: ES2026 Haziran'da onaylandı, ES2027'nin ilk özellikleri de şimdiden belli oldu. Bu yazıda Array.fromAsync'ten using anahtar kelimesine, Iterator.zip'ten Uint8Array base64 desteğine kadar gelen ve gelmekte olan her şeyi örneklerle inceliyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/ecmascript-2026-2027.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - ecmascript
+  - javascript
+  - es2026
+  - es2027
+  - tc39
+---
+
+JavaScript her yıl Haziran'da yeni bir sürüm alıyor ve TC39'un takvimi saat gibi işliyor: Stage 4'e ulaşan öneriler o yılın sürümüne giriyor, treni kaçıranlar sonrakine kalıyor. **ES2026** bu Haziran onaylandı; hatta [Temporal API yazısında](/blog/temporal-api-javascriptte-date-devri-bitti) anlattığım gibi Stage 4'e Mart'ta ulaşan Temporal bile treni kaçırıp **ES2027**'ye kaldı. İki sürümü birden masaya yatıralım: neler geldi, neler yolda, bugün hangileri kullanılabilir?
+
+## ES2026 ile gelenler
+
+### Array.fromAsync — async iterable'dan diziye
+
+`Array.from`'un async kardeşi. Async generator'dan veya promise dizisinden dizi kurmak için elle `for await` döngüsü yazma devri bitti:
+
+```typescript
+async function* fetchPages(urls: string[]) {
+  for (const url of urls) yield fetch(url).then(r => r.json());
+}
+
+const pages = await Array.fromAsync(fetchPages(urls));
+```
+
+### Uint8Array ↔ Base64 — atob/btoa çilesinin sonu
+
+Binary veriyi base64'e çevirmek için bugüne kadar ya `btoa` + string hilesi ya Buffer gerekiyordu. Artık dilin içinde:
+
+```typescript
+const bytes = new TextEncoder().encode("taş kağıt makas");
+const b64 = bytes.toBase64();            // "dGHFnyBrYcSfxLF0IG1ha2Fz"
+const back = Uint8Array.fromBase64(b64); // orijinal byte'lar
+bytes.toHex();                           // hex versiyonu da var
+```
+
+### Map.prototype.getOrInsert (Upsert) — gruplama kalıbının resmileşmesi
+
+Hepimizin ezbere yazdığı şu "varsa al, yoksa oluştur" ritüeli:
+
+```typescript
+// Eski dünya:
+if (!map.has(key)) map.set(key, []);
+map.get(key)!.push(item);
+
+// ES2026:
+map.getOrInsert(key, []).push(item);
+// Değeri tembel üretmek istersen:
+map.getOrInsertComputed(key, () => []).push(item);
+```
+
+### Error.isError — güvenilir hata tespiti
+
+`instanceof Error` iframe/realm sınırlarında yalan söyleyebiliyordu; `Error.isError(value)` bunu `Array.isArray` gibi kesin çözüyor.
+
+### Iterator.concat — iterator'ları uçtan uca ekle
+
+ES2025'in iterator helper'larının üzerine gelen tamamlayıcı: `Iterator.concat(a, b, c)` ile diziye çevirmeden, bellek şişirmeden ardışık tüketim.
+
+### Math.sumPrecise — yuvarlama hatasız toplam
+
+Kayan nokta toplamlarında `reduce((a, b) => a + b)` birikimli hata üretir; `Math.sumPrecise(iterable)` farklı büyüklükteki sayıları hassasiyet kaybını minimize ederek topluyor. Finansal hesap yapanların dikkatine.
+
+Bir de niş ama önemli bir tane var: **JSON.parse source text access** — reviver fonksiyonu artık ham kaynak metnine erişebiliyor, yani büyük sayıları `BigInt`'e kayıpsız parse etmek nihayet mümkün.
+
+## ES2027'ye şimdiden girenler
+
+Stage 4'e ulaşıp bir sonraki sürümü bekleyen dört özellik var ve dördü de ağır top:
+
+### Temporal — tarih/saat devrimi
+
+Bunu [ayrı bir yazıda](/blog/temporal-api-javascriptte-date-devri-bitti) uzun uzun anlattım; özet: `Date` emekli oluyor, immutable ve timezone-bilinçli bir API geliyor. Tarayıcılar spec'i beklemedi bile — Chrome, Edge ve Firefox'ta bugün çalışıyor.
+
+### Explicit Resource Management — using anahtar kelimesi
+
+C#'tan tanıdık `using`, JavaScript'e geliyor: scope'tan çıkarken kaynağı otomatik kapatan deterministik temizlik.
+
+```typescript
+class TempFile implements Disposable {
+  constructor(private path: string) {}
+  [Symbol.dispose]() { fs.rmSync(this.path, { force: true }); }
+}
+
+function processUpload(data: Buffer) {
+  using tmp = new TempFile("/tmp/upload.bin");
+  // ... işle; fonksiyondan NASIL çıkarsan çık (return, throw)
+  // tmp[Symbol.dispose]() garantiyle çağrılır.
+}
+```
+
+`try/finally` merdivenlerinin yerini alacak; dosya, lock, DB bağlantısı, stream... TypeScript tarafında yıllardır desteklendiği için kod tabanları hazır sayılır.
+
+### Joint Iteration — Iterator.zip
+
+Python'daki `zip`'in resmi karşılığı: `Iterator.zip([a, b])` iki iterable'ı paralel gezip çiftler üretiyor; `zipKeyed` ile isimli birleştirme de var.
+
+### Atomics.pause
+
+Paylaşımlı bellekle (SharedArrayBuffer) çalışanlar için spin-wait ipucu — CPU'ya "bekliyorum ama boşuna yakma" demenin standart yolu. Çoğumuz doğrudan kullanmayacağız ama WASM ve worker-yoğun kütüphanelerin altyapısını iyileştirecek.
+
+## Radar: Stage 3 ve altında dikkat çekenler
+
+Spec'e girmesi kesinleşmemiş ama masada olanlar:
+
+- **Deferring Module Evaluation** (`import defer`) — modülü indir ama ilk erişime kadar **çalıştırma**. Başlangıç maliyeti yüksek modüller için lazy-load'un sözdizimine gömülmüş hali.
+- **Import Text / Import Bytes** — dosyayı string veya binary olarak import etmek: `import text from "./sablon.html" with { type: "text" }`. Bundler eklentisiyle yapılan işin standardı.
+- **Iterator ailesine takviyeler** — `chunking` (parça parça işleme), `includes`, `join`. Iterator helpers ekosistemi dizilerdeki konfora hızla yaklaşıyor.
+- **Await Dictionary** — `Promise.all`'un isimli hali: bir nesnedeki tüm promise'leri paralel çözüp aynı şekilli nesne döndürmek.
+- **Decorators** (Stage 2.7) — evet, hâlâ. TypeScript ve Babel'de yıllardır var ama spec yolculuğu sürüyor; framework'ler beklemekten yorulmuş durumda.
+- **ShadowRealm** (Stage 2.7) — izole JS bağlamı: eklenti sistemleri ve güvenli kod çalıştırma için.
+
+Stage 2'de ise iki eski hayal yaşıyor: **Pipeline operator** (`|>`) ve **Pattern Matching**. İkisi de yıllardır aynı yerde — heyecanlanmak için Stage 3'ü bekleyin, ben öyle yapıyorum.
+
+## Bugün ne kullanabilirim?
+
+Pratik durum özeti: ES2026 maddelerinin çoğu modern tarayıcılarda ve Node'un güncel sürümlerinde zaten çalışıyor (spec onayı genelde motorların arkasından gelir, önünden değil). `using` TypeScript + transpiler'la bugün kullanılabilir; Temporal için tarayıcı desteği Chrome/Edge/Firefox'ta hazır, Safari için polyfill gerekiyor.
+
+Benim favori üçlüm: her projede işe yarayacak `Array.fromAsync`, kod tabanlarını sessizce temizleyecek `using` ve küçük ama her gün elimin gittiği `getOrInsert`. Sizin favoriniz hangisi?
+
+Kaynak olarak [TC39'un resmi proposal listesi](https://github.com/tc39/proposals)ni takibe alın — spec'in ham hali kulağa korkutucu gelse de proposal README'leri şaşırtıcı derecede okunaklı. 🚀

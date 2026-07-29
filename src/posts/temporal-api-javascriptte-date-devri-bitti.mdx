@@ -1,0 +1,134 @@
+---
+title: Temporal API Geldi! JavaScript'te Date Devri Resmen Bitti
+description: 25 yıllık Date çilesi sona eriyor. Mart 2026'da Stage 4'e ulaşan Temporal API artık JavaScript'in resmi parçası ve tarayıcılarda çalışıyor. Bu yazıda Temporal'ın temel tiplerini, zaman dilimi yönetimini ve Date'ten geçişi bol örnekle anlatıyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/temporal-api.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - temporal
+  - javascript
+  - date
+  - timezone
+  - es2026
+---
+
+JavaScript'in `Date` nesnesi, dilin en eski ve en çok şikayet edilen parçası. 1995'te on günde tasarlanan dilin, Java'dan aceleyle kopyalanan tarih API'si: aylar sıfırdan başlar (`0` = Ocak), nesne mutable'dır (bir fonksiyona verdiğiniz tarih, döndüğünde değişmiş olabilir), zaman dilimi desteği "cihazın saati neyse o" seviyesindedir. Moment.js, date-fns, Day.js, Luxon... koca bir kütüphane ekosistemi, sırf bu tasarım hatalarını örtmek için var oldu.
+
+Artık gerek yok. **Temporal API**, 11 Mart 2026'da TC39'da Stage 4'e ulaştı — yani artık resmen JavaScript'in parçası. Dokuz yıl süren bir proposal yolculuğunun sonu bu. Tarayıcı tarafında da durum netleşti: **Firefox 139** (Mayıs 2025'te ilk çıkaran oydu), **Chrome 144** ve **Edge 144** (Ocak 2026) Temporal'ı bayraksız gönderiyor. Eksik kalan büyük oyuncu Safari — orada hâlâ Technology Preview aşamasında, o yüzden üretimde şimdilik [polyfill](https://www.npmjs.com/package/@js-temporal/polyfill) ile birlikte kullanıyoruz.
+
+## Temel felsefe: Doğru tip, doğru iş
+
+`Date`'in en derin sorunu her şeyi tek bir tiple temsil etmeye çalışmasıydı: "3 Mart" gibi saati olmayan bir kavram da, "şu andaki kesin an" da aynı nesneydi. Temporal bunu tip sistemine ayırıyor:
+
+- `Temporal.PlainDate` — sadece tarih: doğum günü, resmi tatil.
+- `Temporal.PlainTime` — sadece saat: "her gün 09:00'da".
+- `Temporal.PlainDateTime` — tarih + saat ama zaman dilimi yok.
+- `Temporal.ZonedDateTime` — tarih + saat + zaman dilimi. Gerçek dünyadaki "İstanbul'da 29 Temmuz 18:30".
+- `Temporal.Instant` — evrensel kesin an (epoch bazlı). Log timestamp'i, sunucu kaydı.
+- `Temporal.Duration` — süre: "2 saat 15 dakika".
+
+Ve hepsi **immutable**. Hiçbir metod nesneyi değiştirmez, her işlem yeni değer döndürür.
+
+## İlk temas
+
+```typescript
+// Şu an, cihazın zaman diliminde:
+const now = Temporal.Now.zonedDateTimeISO();
+// 2026-07-29T18:30:45.123+03:00[Europe/Istanbul]
+
+// Sadece bugünün tarihi:
+const today = Temporal.Now.plainDateISO();
+// 2026-07-29
+
+// ISO string'den parse:
+const release = Temporal.PlainDate.from("2026-03-11");
+release.year;      // 2026
+release.month;     // 3  — evet, Mart gerçekten 3! Sıfır tabanlı ay yok.
+release.dayOfWeek; // 3  — Çarşamba (1 = Pazartesi, ISO standardı)
+```
+
+`Date`'ten gelen biri için satır aralarındaki iki devrime dikkat: aylar 1'den başlıyor ve haftanın günü ISO kurallarına uyuyor.
+
+## Aritmetik: Nihayet insan gibi
+
+```typescript
+const today = Temporal.PlainDate.from("2026-07-29");
+
+today.add({ months: 1 });                    // 2026-08-29
+today.subtract({ days: 45 });                // 2026-06-14
+today.with({ day: 1 });                      // 2026-07-01 (ayın ilk günü)
+today.with({ day: 1 }).add({ months: 1 }).subtract({ days: 1 });
+// 2026-07-31 → ayın son günü, elle 30 mu 31 mi düşünmek yok
+
+// İki tarih arası fark:
+const start = Temporal.PlainDate.from("2026-01-01");
+const diff = start.until(today);             // P209D
+diff.total({ unit: "days" });                // 209
+start.until(today, { largestUnit: "months" }); // P6M28D — 6 ay 28 gün
+```
+
+`Date` ile "bir ay ekle" yazmak için milisaniye hesabı yapan ya da `setMonth(getMonth() + 1)` çağırıp ay sonlarında sürpriz yaşayan herkes buradaki rahatlığı hissedecektir. Taşma davranışı bile kontrol edilebilir: 31 Ocak'a bir ay eklerseniz varsayılan olarak 28 Şubat'a "sıkışır", isterseniz `overflow: "reject"` ile hata fırlatır.
+
+## Zaman dilimleri: Asıl büyük kazanım
+
+`Date`'in hiç çözemediği problem buydu. Temporal'da zaman dilimi, değerin parçası:
+
+```typescript
+const meeting = Temporal.ZonedDateTime.from(
+  "2026-08-10T14:00[Europe/Istanbul]",
+);
+
+// Aynı an, New York'ta kaç?
+meeting.withTimeZone("America/New_York").toString();
+// 2026-08-10T07:00:00-04:00[America/New_York]
+
+// Uçuş senaryosu: İstanbul'dan 10:35'te kalk, 4.5 saat uç, Londra'da kaçta inersin?
+const takeoff = Temporal.ZonedDateTime.from("2026-11-02T10:35[Europe/Istanbul]");
+const landing = takeoff
+  .add({ hours: 4, minutes: 30 })
+  .withTimeZone("Europe/London");
+// 2026-11-02T12:05:00+00:00[Europe/London]
+```
+
+Yaz saati geçişleri (DST) de otomatik doğru: aritmetik, ekranda görünen saate göre değil gerçekten geçen zamana göre işliyor ve geçiş günlerindeki "hiç yaşanmayan saat" ya da "iki kez yaşanan saat" durumlarını `disambiguation` seçeneğiyle açıkça yönetebiliyorsunuz. Bunu `Date` ile elle yapmaya çalışmış biri olarak söylüyorum: bu paragraf, API'nin varlık sebebini tek başına haklı çıkarıyor.
+
+## Sıralama, karşılaştırma, formatlama
+
+```typescript
+// Karşılaştırma için hazır statik metod — sort'a doğrudan verilebiliyor:
+dates.sort(Temporal.PlainDate.compare);
+
+// Eşitlik:
+a.equals(b);
+
+// Kullanıcıya gösterim yine Intl ile:
+const d = Temporal.PlainDate.from("2026-07-29");
+d.toLocaleString("tr-TR", { dateStyle: "full" });
+// "29 Temmuz 2026 Çarşamba"
+```
+
+Serileştirme de düşünülmüş: her tip, zaman dilimini de içeren güncel ISO formatına (`2026-08-10T14:00:00+03:00[Europe/Istanbul]`) `toString()` ile çıkıyor ve `from()` ile kayıpsız geri parse ediliyor. JSON'a yaz, oku, hiçbir bilgi kaybolmuyor — `Date`'in "stringe çevirince timezone'u unutan" dünyasından sonra terapi gibi.
+
+## Date'ten geçiş ve bugünkü strateji
+
+Elinizdeki `Date`'lerle köprü de tanımlı:
+
+```typescript
+// Date → Temporal:
+const instant = Temporal.Instant.fromEpochMilliseconds(oldDate.getTime());
+const zoned = instant.toZonedDateTimeISO("Europe/Istanbul");
+
+// Temporal → Date (eski API bekleyen kütüphaneler için):
+const back = new Date(zoned.epochMilliseconds);
+```
+
+Temmuz 2026 itibarıyla pratik önerim şu: kapsam ~%69 (Chrome, Edge, Firefox tamam; fark neredeyse tamamen Safari). Kütüphane veya uygulama yazıyorsanız `@js-temporal/polyfill` ile bugünden Temporal API'sine yazın; Safari stable'a alınca polyfill'i silmek tek satırlık iş olacak. Node tarafında da 26 sürümü Temporal'ı bayraksız getiriyor, yani backend'de yol zaten açık.
+
+Moment.js'i yıllar önce "artık bakım modundayız, yenilerden birini kullanın" derken üzülerek okumuştum; bugün geldiğimiz nokta daha güzel: tarih kütüphanesi seçmek diye bir problem yakında kalmayacak, çünkü doğrusu dilin içinde. 25 yıl sürdü ama değdi. ⏰

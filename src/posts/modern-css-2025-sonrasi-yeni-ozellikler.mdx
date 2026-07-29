@@ -1,0 +1,202 @@
+---
+title: Modern CSS Turu! 2025 ve Sonrasında Gelen Özellikler Nasıl Kullanılır?
+description: CSS son iki yılda belki de tarihindeki en büyük sıçramayı yaptı. Bu yazıda anchor positioning, scroll-driven animasyonlar, if() fonksiyonu, corner-shape ve daha fazlasını gerçek kullanım örnekleri ve tarayıcı destek durumlarıyla anlatıyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/modern-css-2025.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - css
+tags:
+  - css
+  - anchor-positioning
+  - scroll-animation
+  - frontend
+  - tarayici
+---
+
+CSS'i hâlâ "renk ve margin verdiğim dil" olarak görüyorsanız son iki yılı kaçırmışsınız demektir. 2025'ten bu yana gelen özelliklerin ortak teması net: **eskiden JavaScript kütüphanesi gerektiren işler artık tarayıcının işi.** Tooltip konumlandırma, scroll animasyonları, koşullu stiller... hepsine tek tek bakalım — her birinde gerçek bir kullanım örneği ve dürüst bir tarayıcı destek notuyla.
+
+## 1. Anchor Positioning: Popper.js'e veda
+
+Tooltip veya dropdown'u tetikleyicisine göre konumlandırmak için bugüne kadar Floating UI / Popper.js kullanıyorduk. Artık CSS bunu kendisi yapıyor:
+
+```css
+.trigger {
+  anchor-name: --menu-btn;
+}
+
+.dropdown {
+  position: fixed;
+  position-anchor: --menu-btn;
+  top: anchor(bottom);
+  justify-self: anchor-center;
+  /* Ekrana sığmazsa tarayıcı alternatif konuma geçsin: */
+  position-try-fallbacks: flip-block;
+}
+```
+
+`anchor(bottom)` "çapanın alt kenarı" demek; `position-try-fallbacks` ise menü ekranın altına taşarsa otomatik yukarı açılmasını sağlıyor — viewport hesabı, flip mantığı, hepsi tarayıcıda.
+
+**Destek:** Chromium'da hazır, diğerlerinde henüz dengesiz. Kullanıcıya kritik olmayan yerlerde `@supports (anchor-name: --a)` sorgusuyla aşamalı geçiş yapın.
+
+## 2. Scroll-Driven Animations: IntersectionObserver'sız paralaks
+
+Scroll'a bağlı animasyon için artık ne scroll listener ne IntersectionObserver gerekiyor; animasyon compositor'da çalışıyor, ana thread'e hiç dokunmuyor:
+
+```css
+/* Sayfa scroll'una bağlı okuma ilerleme çubuğu: */
+.progress {
+  animation: grow linear;
+  animation-timeline: scroll(root);
+  transform-origin: left;
+}
+@keyframes grow {
+  from { scale: 0 1; }
+  to   { scale: 1 1; }
+}
+
+/* Eleman görünüme girerken beliren kart: */
+.card {
+  animation: fade-in linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 60%;
+}
+@keyframes fade-in {
+  from { opacity: 0; translate: 0 40px; }
+}
+```
+
+`scroll()` sayfanın scroll konumunu, `view()` elemanın viewport içindeki yolculuğunu zaman çizelgesi yapıyor. 2026'nın devamında Chrome 145 ile "scroll-triggered" varyantı da geliyor: belirli scroll eşiği geçilince bir kez tetiklenen, süre bazlı animasyonlar.
+
+**Destek:** Chromium ve Firefox'ta hazır; Safari'de yeni yeni. Dekoratif animasyonlar için bugün gönül rahatlığıyla kullanılabilir — desteklemeyen tarayıcı animasyonsuz ama çalışır sayfa görür.
+
+## 3. if() Fonksiyonu: Değer seviyesinde koşul
+
+2025'in ses getiren eklemesi. Artık tek bir property değerinin içinde koşul yazabiliyorsunuz:
+
+```css
+.badge {
+  --variant: none;
+  background: if(
+    style(--variant: success): #16a34a;
+    style(--variant: danger): #dc2626;
+    else: #6b7280
+  );
+}
+```
+
+```html
+<span class="badge" style="--variant: success">Aktif</span>
+```
+
+`style()` custom property sorguluyor; `media()` ve `supports()` da aynı sözdiziminde kullanılabiliyor. Varyant başına ayrı sınıf yazmak yerine tek satırda eşleme — utility-class kalabalığını ciddi azaltıyor.
+
+**Destek:** Şimdilik yalnızca Chromium. `else` dalı doğal fallback olduğu için aşamalı kullanım kolay ama kritik stillerde henüz tek başına güvenmeyin.
+
+## 4. corner-shape: border-radius'un ötesi
+
+Köşenin sadece "ne kadar" değil, **nasıl** yuvarlanacağını da seçebiliyorsunuz — iOS ikonlarındaki meşhur squircle dahil:
+
+```css
+.icon {
+  border-radius: 32px;
+  corner-shape: superellipse(2);  /* squircle */
+}
+
+.tag {
+  border-radius: 16px;
+  corner-shape: bevel;            /* kesik köşe — clip-path'e gerek yok */
+}
+```
+
+`round`, `bevel`, `notch`, `scoop`, `squircle` gibi değerler var; `superellipse()` ile derece de verebiliyorsunuz. Kesik köşeli buton için `clip-path` matematiği yazdığınız günler geride kalıyor.
+
+**Destek:** Chrome 139+ — Baseline değil, tamamen dekoratif işlerde şimdiden kullanın, gerisi `border-radius`'a düşer zaten.
+
+## 5. Saf CSS carousel: ::scroll-button ve ::scroll-marker
+
+2025'in en "cidden CSS'te mi bu?" özelliği. Scroll container'a ok butonları ve nokta göstergeleri **pseudo-element** olarak ekleniyor:
+
+```css
+.carousel {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-marker-group: after;
+}
+.carousel > li {
+  scroll-snap-align: center;
+}
+.carousel::scroll-button(right) {
+  content: "→";
+}
+.carousel::scroll-button(left) {
+  content: "←";
+}
+.carousel > li::scroll-marker {
+  content: "";
+  width: 8px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #d1d5db;
+}
+.carousel > li::scroll-marker:target-current {
+  background: #111827;
+}
+```
+
+Butonlar tıklanınca tarayıcı kendisi kaydırıyor, aktif nokta `:target-current` ile stillenıyor, klavye erişilebilirliği de tarayıcıdan geliyor. Sıfır JavaScript.
+
+**Destek:** Chrome 135+. Diğerleri yolda; carousel kütüphanesi eklemeden önce bir düşünün derim.
+
+## 6. İki küçük ama hayat kurtaran: field-sizing ve interpolate-size
+
+**Yazarken büyüyen textarea** — yıllardır JS ile scrollHeight ölçtüğümüz iş:
+
+```css
+textarea {
+  field-sizing: content;
+  min-height: 3lh;
+  max-height: 12lh;
+}
+```
+
+**`height: auto`'ya animasyon** — akordeon açılışını nihayet transition ile yapabiliyoruz:
+
+```css
+:root {
+  interpolate-size: allow-keywords;
+}
+.accordion-panel {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.3s ease;
+}
+.accordion-panel.open {
+  height: auto;  /* evet, auto'ya transition çalışıyor */
+}
+```
+
+İkisi de Chromium'da hazır, Firefox/Safari kısmen yolda — ikisi de bozulmadan düşen (graceful) özellikler olduğu için bugün eklemenin hiçbir maliyeti yok.
+
+## Genel strateji: 2026'da CSS nasıl yazılır?
+
+Bu özelliklerin çoğu henüz her tarayıcıda yok ve bu, kullanmamak için bir sebep değil — doğru desen şu:
+
+```css
+/* Temel deneyim her yerde çalışır: */
+.dropdown { position: fixed; inset-block-start: 100%; }
+
+/* Yeteneği olan tarayıcı daha iyisini alır: */
+@supports (anchor-name: --a) {
+  .dropdown { position-anchor: --menu-btn; top: anchor(bottom); }
+}
+```
+
+Aşamalı iyileştirme (progressive enhancement), 2010'ların nostaljik terimi değil; tam olarak bugünün çalışma şekli. Tarayıcının işini tarayıcıya bırakın — bundle küçülür, ana thread rahatlar, kod azalır.
+
+Sıradaki yazıda görüşmek üzere. 🎨

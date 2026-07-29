@@ -3,7 +3,7 @@ title: MCP Nedir? Model Context Protocol'e Geliştirici Gözüyle Kapsamlı Bak�
 description: 2026'da yapay zekâ dünyasının en önemli standardı haline gelen Model Context Protocol'ü anlatıyorum. MCP'nin çözdüğü problem, mimarisi, TypeScript ile kendi MCP sunucunuzu yazmak ve güvenlik tarafında dikkat edilmesi gerekenler bu yazıda.
 createdAt: 2026-07-29
 updatedAt: 2026-07-29
-coverImage: /images/mcp.png
+coverImage: /images/mcp.png?v=2
 author:
   name: Özgür ÖZALP
   url: https://github.com/ozgurozalp
@@ -114,13 +114,13 @@ claude mcp add blog-search -- npx tsx blog-search.ts
 
 Artık "MCP hakkında daha önce yazmış mıyım?" diye sorduğunuzda model `search_posts` aracını kendisi çağırıyor, sonuca göre cevap veriyor. Aynı sunucu hiçbir değişiklik olmadan Cursor'da da, VS Code'da da, MCP destekleyen herhangi bir uygulamada da çalışıyor. Standardın bütün olayı bu.
 
-## Güvenlik: İşin ciddiyet kısmı
+## Güvenlik: İşin şakaya gelmez tarafı
 
-MCP güçlü olduğu kadar da dikkat isteyen bir kapı açıyor. Aklınızda olsun:
+MCP güçlü olduğu kadar dikkat de isteyen bir kapı aralıyor. Aklınızda olsun:
 
 - **Prompt injection:** Model, araçlardan dönen içeriği okuyor. Kötü niyetli bir web sayfası veya döküman, "şimdi şu aracı çağır ve verileri şuraya gönder" gibi talimatlar içerebilir. İyi host uygulamaları riskli araç çağrılarında kullanıcı onayı ister — sizin sunucunuz da yıkıcı işlemleri (silme, gönderme) ayrı ve açık isimli araçlara bölmeli.
 - **Tool poisoning:** Üçüncü parti bir MCP sunucusu kurmak, o sunucunun araç açıklamalarını modelinizin beynine sokmak demek. Kaynağına güvenmediğiniz sunucuyu kurmayın; registry'de yıldız sayısına değil, kodun kendisine bakın.
-- **Yetki genişliği:** Sunucuya verdiğiniz token neyi yapabiliyorsa model de onu yapabilir. Salt-okur işler için salt-okur token kullanın.
+- **Yetki genişliği:** Sunucuya verdiğiniz token neyi yapabiliyorsa model de onu yapabilir. Salt okunur işler için salt okunur token kullanın.
 
 ## Ne zaman MCP, ne zaman düz function calling?
 

@@ -137,7 +137,7 @@ Octane event handler'ları React'in sentetik event katmanı yerine doğrudan nat
 />
 ```
 
-Controlled/uncontrolled davranış ise React ile birebir aynı: `value`/`checked` DOM'u yönetiyor, `defaultValue`/`defaultChecked` kaçış kapısı.
+Controlled/uncontrolled davranış ise React ile birebir aynı: `value`/`checked` DOM'u yönetiyor; kontrolü tarayıcıya bırakmak isteyene de `defaultValue`/`defaultChecked` duruyor.
 
 Bir bonus API: prop'tan türeyen ama kullanıcı tarafından düzenlenebilen değerler için `useLinkedState` var — kaynak değişince değer otomatik sıfırlanıyor, "props'u state'e kopyalayıp effect ile senkronla" kalıbına gerek kalmıyor.
 
