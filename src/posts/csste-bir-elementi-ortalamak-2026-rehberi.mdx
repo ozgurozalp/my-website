@@ -1,0 +1,133 @@
+---
+title: CSS'te Bir Elementi Ortalamak Artık Espri Konusu Değil
+description: Yıllarca internetin en meşhur şakasıydı, oysa bugün CSS'te ortalama tek satırlık bir iş. Bu yazıda 2026'da hangi ortalama yöntemini ne zaman kullanacağınızı, yeni gelen align-content ve anchor-center dahil, örneklerle anlatıyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/css-ortalama.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - css
+tags:
+  - css
+  - flexbox
+  - grid
+  - frontend
+---
+
+"CSS'te bir div nasıl ortalanır?" — internetin en uzun ömürlü şakalarından biri. Haksız da değildi: 2010'larda dikey ortalama gerçekten bir işkenceydi. `vertical-align` neden çalışmıyor diye saçını yolan, negatif margin hesaplayan, tablo layout'una sığınan herkes o dönemin gazisi.
+
+Ama şakanın raf ömrü doldu. 2026'da ortalama **tek satır**, üstelik birden fazla güzel seçeneğiniz var. Bu yazıda hangi durumda hangisini kullandığımı anlatacağım — sonda da işin mizah tarafını devralan güzel bir kaynak var.
+
+## Kısa cevap: place-items
+
+Bir kapsayıcının içindeki her şeyi ortalamak istiyorsanız benim varsayılanım bu:
+
+```css
+.parent {
+  display: grid;
+  place-items: center;
+}
+```
+
+`place-items`, `align-items` + `justify-items` kısaltması. İçerideki eleman(lar) hem yatay hem dikey ortada. Kapsayıcının yüksekliği nereden geliyorsa oradan — sabit değer, `min-height: 100dvh`, fark etmez.
+
+Tek elemanlı overlay/hero senaryolarında bunun yerine `place-content: center` da kullanabilirsiniz; birden fazla çocuk varsa davranışları ayrışır (`place-items` her çocuğu kendi hücresinde ortalar, `place-content` içerik bloğunu topluca ortalar). İkisini bir kez yan yana deneyin, farkı kalıcı öğrenirsiniz.
+
+## Flexbox hâlâ iş görüyor
+
+Grid'den önce öğrendiysem diye değil — satır içinde birden fazla eleman dizip **aynı anda** ortalamak istediğimde flex daha doğal:
+
+```css
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+```
+
+Grid mi flex mi tartışmasının ortalama özelinde pratik cevabı şu: tek şey ortalıyorsan grid + `place-items`, bir grup şeyi aralıklarıyla beraber ortalıyorsan flex.
+
+## Yeni nesil: display bile değiştirmeden
+
+2024 sonundan beri Baseline'da olan ve hâlâ az bilinen numara: `align-content` artık **düz block elemanlarda** çalışıyor. Yani ne grid ne flex — hiçbir display değişikliği olmadan dikey ortalama:
+
+```css
+.card {
+  height: 300px;
+  align-content: center; /* display: block! */
+}
+```
+
+Bunu ilk gördüğümde "bu kadar mı yani?" dedim. Evet, bu kadar. Yatayı da istiyorsanız içerideki elemana `margin-inline: auto` eklersiniz. Modal içeriği, kart gövdesi gibi "sadece dikeyde ortala, layout'a dokunma" durumları için birebir.
+
+## Margin auto: Grid'in içinde süper güç
+
+`margin: auto`'yu yatay ortalamadan tanıyoruz ama grid/flex kapsayıcı içindeki bir elemanda **dört yönde** çalışır:
+
+```css
+.parent {
+  display: grid;
+}
+.child {
+  margin: auto; /* hem yatay hem dikey ortada */
+}
+```
+
+Kapsayıcıya değil de tek bir çocuğa "sen ortala" demek istediğinizde (diğer çocuklar başka türlü yerleşirken) en temiz yol bu.
+
+## Overlay klasiği: absolute + inset
+
+Tooltip, modal, badge gibi akıştan kopuk elemanlar için eski dostumuz:
+
+```css
+.overlay {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+}
+```
+
+Bir dönemin standardı olan `top: 50%; left: 50%; transform: translate(-50%, -50%)` üçlüsü de hâlâ çalışıyor ve boyutu bilinmeyen elemanlarda işe yarıyor — ama `inset: 0` + `margin: auto` + `fit-content` kombinasyonu transform'u başka amaçlarla (animasyon gibi) kullanmak istediğinizde çakışma derdi çıkarmadığı için benim tercihim.
+
+## Ufukta: anchor-center
+
+[Modern CSS yazısında](/blog/modern-css-2025-sonrasi-yeni-ozellikler) anlattığım anchor positioning'in ortalamaya hediyesi de var: bir elemanı **başka bir elemana göre** ortalamak.
+
+```css
+.trigger { anchor-name: --btn; }
+
+.tooltip {
+  position: absolute;
+  position-anchor: --btn;
+  bottom: anchor(top);
+  justify-self: anchor-center; /* tetikleyiciye göre yatay ortalı */
+}
+```
+
+Kapsayıcıya göre değil, sayfadaki herhangi bir referans elemana göre ortalama — tooltip'lerin yıllardır JS ile yaptığı işin CSS karşılığı. Şimdilik Chromium'da; `@supports` ile sarmalayıp bugünden kullanmaya başlayabilirsiniz.
+
+## Peki hangisini kullanayım?
+
+Karar ağacım kısaca şöyle:
+
+| Durum | Yöntem |
+| ----- | ------ |
+| Kapsayıcıdaki her şeyi ortala | `display: grid; place-items: center` |
+| Bir grup elemanı aralıklarıyla ortala | flex + `align-items` + `justify-content` |
+| Display'e dokunmadan sadece dikey | `align-content: center` (block'ta çalışıyor!) |
+| Tek çocuğu ortala, diğerlerine karışma | çocuğa `margin: auto` |
+| Akış dışı overlay | `position: absolute; inset: 0; margin: auto` |
+| Başka bir elemana göre ortala | anchor positioning + `anchor-center` |
+
+## Ve işin mizah mirası
+
+Yazının başındaki şakayı en güzel taşıyan yer, [Temani Afif'in Center Generator'ı](https://css-generators.com/center/): aynı kutuyu ortalamanın **100 farklı yolunu** listeleyen bir araç. Bir kısmı ciddi ciddi kullanışlı, bir kısmı "sakın yapmayın" etiketiyle duran mizansen. CSS'in ne kadar yol katettiğini tek sayfada görmek isteyenlere bakması keyifli bir zaman kapsülü.
+
+Ortalamak artık zor değil; zor olan hangi kolay yolun o günkü işe en çok yakıştığına karar vermek. Umarım yukarıdaki tablo o kararı hızlandırır. 🎯
