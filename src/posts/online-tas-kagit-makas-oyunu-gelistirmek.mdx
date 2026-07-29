@@ -1,0 +1,62 @@
+---
+title: Online Taş Kağıt Makas Oyunu Geliştirmek
+description: Arkadaşınla link üzerinden oynayabildiğin gerçek zamanlı bir taş kağıt makas oyunu yaptım. Bu yazıda projenin hikayesini, kullandığım teknolojileri ve karşılaştığım ilginç problemleri anlatıyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/tas-kagit-makas.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - nuxt
+  - vue
+  - socket-io
+  - redis
+  - expo
+  - react-native
+  - oyun
+---
+
+Bir tartışmayı çözmenin en adil yolu nedir? Yazı tura desen tek şansa bakıyor, "kim önce derse" desen kavga çıkıyor. Ben de bu dünya kadar eski problemi biraz abartıp gerçek zamanlı, çok oyunculu bir web oyununa çevirdim: [Taş Kağıt Makas](https://taskagitmakas.online/) — İngilizce tarafı için [Rock Paper Scissors Online](https://rock.paperscissors.online/).
+
+Fikir basit: bir oda açıyorsun, linki arkadaşına atıyorsun, ikiniz de seçiminizi yapıyorsunuz ve kazanan belli oluyor. İstersen rastgele eşleşmeyle tanımadığın biriyle de oynayabiliyorsun. Tamamen ücretsiz, reklamsız. Ama bu basit fikrin altında anlatmaya değer birkaç mühendislik problemi yatıyor.
+
+## Teknoloji seçimleri
+
+Proje aslında üç ayrı uygulama:
+
+- **Web:** Nuxt 3 + Vue 3. SSR sayesinde sayfalar sunucuda render ediliyor. State için Pinia, sunucu verisi için TanStack Query kullanıyorum.
+- **Mobil:** Expo / React Native. iOS uygulaması web ile aynı backend'e, aynı socket protokolüyle bağlanıyor.
+- **Backend:** Node.js + Express + Socket.IO. Kalıcı veri PostgreSQL'de (Prisma ile), canlı maç durumu ise Redis'te.
+
+Redis buradaki en kritik parça. Bir oyun odası, koltuklar, seçimler, skorlar — bunların hiçbiri veritabanına yazılmıyor. Hepsi 2 saatlik TTL ile Redis'te yaşıyor; maç bitince sadece sonuç Postgres'e düşüyor. Böylece veritabanı, saniyeler içinde açılıp kapanan binlerce odanın yükünü hiç görmüyor.
+
+## En sevdiğim problem: hile
+
+Gerçek zamanlı bir oyunda "istemciye asla güvenme" kuralı klişe gibi görünür ama taş kağıt makasta çok somut bir karşılığı var: rakibinin seçimini **senin seçiminden önce** öğrenebiliyorsan, oyun bitmiştir.
+
+Bu yüzden protokol "önce taahhüt, sonra açıklama" (commit-before-reveal) mantığıyla çalışıyor. İki oyuncu da seçimini sunucuya gönderiyor, ama sunucu hiçbir seçimi karşı tarafa iletmiyor — ta ki ikisi de kilitlenene kadar. Kazananı, skoru, hatta ekranda görünen kullanıcı adlarını bile sunucu hesaplıyor. İstemci hiçbir zaman "ben kazandım" diyemiyor; sadece "seçimim bu" diyebiliyor.
+
+Aynı şekilde koltuk sistemi de atomik: iki kişi aynı anda aynı odaya girmeye çalıştığında Redis üzerindeki tek bir atomik işlem kimin oturduğuna karar veriyor. Bu tür yarış durumları (race condition) test ortamında neredeyse hiç görünmüyor ama canlıda ilk günden karşına çıkıyor.
+
+## İki domain, tek uygulama
+
+İlginç bir başka detay: dil seçimi URL'den değil, domain'den geliyor. [taskagitmakas.online](https://taskagitmakas.online/) Türkçe, [rock.paperscissors.online](https://rock.paperscissors.online/) İngilizce. Aynı Nuxt uygulaması, `@nuxtjs/i18n`'in `differentDomains` özelliğiyle iki ayrı kimliğe bürünüyor. `/tr` veya `/en` gibi path öneki yok; hangi domain'den girersen o dilde bir ürün görüyorsun.
+
+Bu yaklaşımın hoş bir yan etkisi var: her iki site de kendi dilinde bağımsız bir ürün gibi davranabiliyor. Mesela İngilizce tarafta oyunun tarihinden turnuva stratejilerine uzanan bir [blog](https://rock.paperscissors.online/blog) var — [taş kağıt makasta nasıl kazanılır](https://rock.paperscissors.online/blog/how-to-win-rock-paper-scissors) gibi, oyun teorisine giren yazılar bile mevcut.
+
+## Mobil taraf
+
+iOS uygulaması aynı oyunun ikinci yüzü. Expo Router, Zustand ve React Query ile yazıldı; Socket.IO bağlantısı web ile birebir aynı protokolü konuşuyor. Web'de olmayan tarafları da var: arkadaş listesi, push bildirimleri ve maç sırasında Dynamic Island'da skor gösteren Live Activity desteği.
+
+İki istemcinin aynı protokolü konuşması kulağa kolay geliyor ama pratikte "web'de düzelttiğim bug mobilde de var mı?" sorusunu her seferinde sormak gerekiyor. Oyun store'ları birebir aynı davranışa sahip olacak şekilde paralel tutuluyor.
+
+## Sonuç
+
+Küçük görünen projelerin en güzel yanı bu: taş kağıt makas gibi üç kurallı bir oyunun içinden gerçek zamanlı senkronizasyon, hile önleme, atomik durum yönetimi ve çok dilli mimari gibi konular çıkıyor.
+
+Denemek istersen: Türkçe için [taskagitmakas.online](https://taskagitmakas.online/), for the English side [rock.paperscissors.online](https://rock.paperscissors.online/). Bir tartışmanız varsa artık adil bir çözüm yolu var. ✌️
