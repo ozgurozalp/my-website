@@ -1,0 +1,176 @@
+---
+title: CSS'te infinity Diye Bir Şey Var ve 9999px Yazma Devrini Bitiriyor
+description: CSS'te calc(infinity * 1px) yazabildiğinizi biliyor muydunuz? Bu yazıda infinity anahtar kelimesinin nasıl çalıştığını ve pill butonlardan animasyon dondurmaya, tam ekran backdrop'tan koşullu köşe yuvarlamaya kadar sekiz pratik kullanımını anlatıyorum.
+createdAt: 2026-07-30
+updatedAt: 2026-07-30
+coverImage: /images/css-infinity.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - css
+tags:
+  - css
+  - calc
+  - infinity
+  - frontend
+  - ipucu
+---
+
+Hepimizin CSS'te yazdığı bir satır var:
+
+```css
+border-radius: 9999px;
+```
+
+Amaç belli: elemanın köşelerini tam yuvarlat, pill (kapsül) şeklini al. 9999 sayısının kendisi anlamsız — sadece "yeterince büyük bir sayı" olarak seçilmiş. Bazıları 999px yazar, bazıları 100vmax, bazıları 50%. Hepsi aynı niyetin farklı tahminleri.
+
+Oysa CSS'in bu iş için gerçek bir anahtar kelimesi var: **`infinity`**. Ve kullanım alanı köşe yuvarlamanın çok ötesine geçiyor.
+
+Bu konuyu ilk defa [Adam Argyle'ın derlediği listede](https://nerdy.dev/css-infinity-use-cases) toplu halde görünce şaşırdım — birkaçını biliyordum ama çoğu benim için yeniydi. Aşağıda hem nasıl çalıştığını hem de sekiz pratik kullanımını anlatıyorum.
+
+## Nasıl çalışıyor?
+
+`infinity`, CSS matematik sabitlerinden biri — `pi`, `e` ve `NaN` ile aynı aileden. Tek başına bir değer olarak değil, **`calc()` içinde** kullanılıyor:
+
+```css
+/* ✗ çalışmaz — infinity bir uzunluk değil, bir sayı */
+border-radius: infinity;
+
+/* ✓ doğru kullanım — sayıyı bir birimle çarpıyoruz */
+border-radius: calc(infinity * 1px);
+```
+
+Tarayıcı sonsuz bir değer hesaplamaya çalışmıyor tabii. Yaptığı şey: değeri **o özellik için desteklediği maksimuma kırpmak**. Yani `calc(infinity * 1px)` demek, "bu özelliğin alabileceği en büyük değeri ver" demenin standart yolu.
+
+İşin güzel tarafı bu. `9999px` bir tahmin; `infinity` bir niyet beyanı. Ve tarayıcının maksimumu ne olursa olsun her zaman doğru sonucu veriyor.
+
+2022-2023 arasında tüm modern tarayıcılarda yayınlandı, bugün rahatça kullanılabilir durumda.
+
+## 1. Pill ve daire: klasik kullanım
+
+```css
+.pill {
+  border-radius: calc(infinity * 1px);
+}
+```
+
+Eleman ne kadar yüksek olursa olsun kenarlar tam yarım daire olur. `9999px`'in yaptığı işi yapıyor ama artık kodu okuyan kişi sayının nereden geldiğini merak etmiyor.
+
+Kare bir elemanda aynı satır tam daire verir — `border-radius: 50%` ile arasındaki fark, dikdörtgen elemanlarda ortaya çıkıyor: `50%` elipse dönüşür, `infinity` ise kapsül şeklini korur.
+
+## 2. Koşullu köşe yuvarlama
+
+Bu benim en sevdiğim numara oldu. Kartınız ekrana tam yayıldığında (full-bleed) köşe yuvarlaması istemiyorsunuz, daraldığında istiyorsunuz. Genelde bunun için media query yazılır. Gerek yok:
+
+```css
+.card {
+  border-radius: clamp(0px, (100vi - 100%) * infinity, 20px);
+}
+```
+
+Mantık şu: `100vi - 100%` ifadesi, eleman tam genişlikteyken sıfır veya negatif, daraldığında pozitif olur. `infinity` ile çarpınca sonuç ya çok küçük ya çok büyük bir değere savrulur — `clamp()` de bunu ya alt sınıra (`0px`) ya üst sınıra (`20px`) kırpar.
+
+Yani `infinity` burada bir **anahtar (switch)** gibi çalışıyor: pozitifse üst sınır, değilse alt sınır. Media query'siz, container query'siz, tek satırlık koşullu değer.
+
+## 3. z-index: en üste çık
+
+```css
+.modal {
+  z-index: calc(infinity);
+}
+```
+
+Tarayıcının maksimum tamsayısına (2147483647) çıkıyor. `z-index: 99999` yazıp sonra başka bir yerde `999999` görmenin verdiği o yorgunluğu bilirsiniz — bu onu bitiriyor.
+
+Ama dürüst olalım: bu bir çözüm değil, bir kaçış. Doğru yaklaşım stacking context'leri düzgün kurmak. Yeni kod yazıyorsanız `isolation: isolate` ve modal'lar için popover/dialog gibi native çözümlere bakın. Bunu miras kod tabanındaki bir yangını söndürmek için kullanın.
+
+## 4. Animasyonu dondur: bir devtools numarası
+
+Bu, hata ayıklamada gerçekten işe yarıyor:
+
+```css
+.debug {
+  animation-duration: calc(infinity * 1s);
+}
+```
+
+Animasyon o kadar uzun sürüyor ki fiilen donmuş görünüyor — ilk karesinde takılı kalıyor. Devtools'ta bir animasyonun ortasındaki bir ana bakmak istediğinizde `animation-play-state: paused` de benzer iş yapar, ama süreyi sonsuza çekmenin bir avantajı var: animasyon *başlıyor* ve durum makinesi ilerlemiş oluyor; sadece görsel değişim algılanamayacak kadar yavaş.
+
+## 5. View transition'ı incelemek
+
+4. maddenin en faydalı uygulaması bu. Sayfa geçişleri milisaniyeler içinde bitiyor ve incelemek neredeyse imkânsız:
+
+```css
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: calc(infinity * 1s);
+}
+```
+
+Geçiş donuyor, DOM'da ne olduğunu rahatça inceleyebiliyorsunuz. View transition ile uğraşıp "bir kere daha tetikleyip yakalamaya çalışayım" döngüsüne girmiş herkes için ilaç. Bunu geliştirme sırasında geçici olarak ekleyin, üretime göndermeyin.
+
+## 6. Tam ekran backdrop: box-shadow ile
+
+Modal arkasındaki karartma için genelde ayrı bir overlay elemanı yazarız. `box-shadow`'un spread değeriyle buna gerek kalmıyor:
+
+```css
+.popover {
+  box-shadow: 0 0 0 calc(infinity * 1px) #0005;
+}
+```
+
+Gölge her yöne ekran dışına taşacak kadar yayılıyor — sonuç, elemanın etrafını saran tam ekran bir karartma. Ekstra DOM düğümü yok.
+
+Kritik bir avantajı da var: `box-shadow` **tıklamaları engellemez**. Yani arkadaki içerik hâlâ etkileşimli kalır. Bu duruma göre artı ya da eksi olabilir — modal'da genelde etkileşimi *engellemek* istersiniz, o zaman gerçek bir overlay veya `<dialog>` doğru tercih. Ama tooltip, popover, vurgulama gibi durumlarda tam istediğiniz davranış.
+
+## 7. clamp()'ten sınırı kaldırmak
+
+`clamp()` üç değer ister ama bazen sadece birini sınırlamak istersiniz:
+
+```css
+/* Sadece üst sınır — alt sınır yok */
+width: clamp(calc(-infinity * 1px), 100%, 600px);
+
+/* Sadece alt sınır — üst sınır yok */
+width: clamp(200px, 100%, calc(infinity * 1px));
+```
+
+`min()` ve `max()` ile de yazabilirsiniz elbette. Ama duyarlı boyutlandırma kurallarınızı hep `clamp()` ile yazıyorsanız, biçimi bozmadan tek kenarı serbest bırakmak okunabilirliği koruyor — yarısı `clamp`, yarısı `min` olan bir dosyadan iyidir.
+
+## 8. Scroll animasyonunu kalıcı kılmak
+
+Scroll'a bağlı animasyonlarda (bunları [modern CSS yazımda](/blog/modern-css-2025-sonrasi-yeni-ozellikler) anlatmıştım) bir eşiği geçtikten sonra durumun kalıcı olmasını isteyebilirsiniz:
+
+```css
+.reveal {
+  timeline-trigger-activation-range-end: calc(infinity * 1px);
+}
+```
+
+Tetiklenme aralığının sonu asla gelmediği için animasyon geri sarmıyor — bir kez göründükten sonra öyle kalıyor. "Görünüme girince belir, sonra kaybolmasın" davranışının doğal karşılığı.
+
+Bu özellik henüz yeni; kullanmadan önce hedef tarayıcılarda destek durumunu kontrol edin ve `@supports` ile sarın.
+
+## Peki neden sadece 9999px yazmıyoruz?
+
+Dürüst cevap: çoğu durumda `9999px` de çalışır. Farkı üç yerde görüyorum.
+
+**Niyet.** `9999px` okuyana "neden 9999?" diye sordurur. `calc(infinity * 1px)` ne istediğinizi söyler. Kod okunurluğu, kod uzunluğundan önemli.
+
+**Doğruluk.** Çok büyük elemanlarda `9999px` yetmeyebilir; `infinity` her zaman maksimuma gider. Tarayıcı sınırlarının ne olduğunu ezberlemeniz gerekmez.
+
+**İfade gücü.** 2. maddedeki koşullu köşe yuvarlaması ya da 7. maddedeki tek taraflı `clamp`, sabit bir sayıyla yazılamaz. Bunlar `infinity`'nin *matematiksel* davranışından doğuyor — sadece "büyük bir sayı" olmasından değil.
+
+Buna karşılık makul bir eleştiri de var: `calc(infinity * 1px)`, `9999px`'ten uzun ve ilk gören için daha az tanıdık. Ekipte bunu kullanmaya karar verirseniz bir kez konuşup ortak karar almak iyi olur; yarısı `9999px` yarısı `infinity` olan bir kod tabanı ikisinden de kötü.
+
+## Kapanış
+
+`infinity`, CSS'in "gizli özellik" değil ama "az bilinen özellik" kategorisindeki en kullanışlı parçalarından biri. Özellikle 2. ve 5. maddeler — koşullu köşe yuvarlama ve view transition dondurma — bugün işime yarayacak şeyler.
+
+Sekiz maddenin tamamını tek yerde toplayan [Adam Argyle'ın yazısına](https://nerdy.dev/css-infinity-use-cases) da bakmanızı öneririm; canlı örnekleriyle görmek istersiniz.
+
+Bir sonraki yazıda görüşmek üzere. ♾️
