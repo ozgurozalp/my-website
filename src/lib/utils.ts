@@ -20,7 +20,17 @@ export function capitalize(str: string) {
 }
 
 export async function getParentMetadata(parent: ResolvingMetadata) {
-  const metadata = structuredClone(await parent);
+  // structuredClone throws DataCloneError since Next 15.2.8: the resolved
+  // metadata contains non-cloneable objects (e.g. metadataBase as URL), which
+  // breaks prerendering of every page using this helper. Shallow-copy the
+  // nested objects we actually mutate instead of deep-cloning everything.
+  const resolved = await parent;
+  const metadata = {
+    ...resolved,
+    ...(resolved.title ? { title: { ...resolved.title } } : {}),
+    ...(resolved.twitter ? { twitter: { ...resolved.twitter } } : {}),
+    ...(resolved.openGraph ? { openGraph: { ...resolved.openGraph } } : {}),
+  };
   if (metadata.twitter?.title?.absolute) {
     // @ts-ignore
     metadata.twitter.title = metadata.twitter.title.absolute;
