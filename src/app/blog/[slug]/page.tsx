@@ -89,8 +89,9 @@ export default async function Page({ params }: Props) {
                 <MDXRenderer
                   remarkPlugins={remarkPlugins}
                   components={components}
-                  value={content}
-                />
+                >
+                  {content}
+                </MDXRenderer>
               </div>
             </div>
             <div className="sticky top-16 lg:top-1 col-span-1 hidden flex-col divide-y divide-gray-200 self-start sm:flex">
