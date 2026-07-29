@@ -1,0 +1,131 @@
+---
+title: MCP Nedir? Model Context Protocol'e Geliştirici Gözüyle Kapsamlı Bakış
+description: 2026'da yapay zekâ dünyasının en önemli standardı haline gelen Model Context Protocol'ü anlatıyorum. MCP'nin çözdüğü problem, mimarisi, TypeScript ile kendi MCP sunucunuzu yazmak ve güvenlik tarafında dikkat edilmesi gerekenler bu yazıda.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/mcp.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - ai
+tags:
+  - mcp
+  - yapay-zeka
+  - llm
+  - typescript
+  - node-js
+  - ajan
+---
+
+Son bir buçuk yılda yapay zekâ tarafında bir sürü şey duydunuz: ajanlar, tool calling, RAG... Ama bu dönemden geriye kalacak asıl altyapı parçası muhtemelen üç harf: **MCP**, yani **Model Context Protocol**.
+
+Kısaca tanım: MCP, yapay zekâ uygulamalarının (Claude, ChatGPT, Cursor, VS Code...) dış dünyadaki araçlara ve verilere **standart bir protokolle** bağlanmasını sağlayan açık bir standart. En sevilen benzetmeyle: **yapay zekâ ajanları için USB-C**. Nasıl her cihaz için ayrı şarj kablosu taşımaktan USB-C sayesinde kurtulduysak, her modele ayrı entegrasyon yazmaktan da MCP sayesinde kurtuluyoruz.
+
+## Çözdüğü problem: N×M entegrasyon cehennemi
+
+MCP'den önce durum şuydu: elinizde N tane yapay zekâ uygulaması (Claude, ChatGPT, Cursor...) ve M tane bağlanmak istediğiniz sistem var (GitHub, Postgres, Slack, kendi API'niz...). Her uygulama × her sistem için ayrı bir entegrasyon gerekiyordu: N×M tane yapıştırıcı kod.
+
+MCP bu denklemi N+M'e indiriyor. Sistem sahibi **bir kere** MCP sunucusu yazıyor, yapay zekâ uygulaması **bir kere** MCP istemcisi implemente ediyor. Sonrası tak-çalıştır.
+
+Bunun ne kadar tuttuğunu rakamlar anlatıyor: Anthropic protokolü Kasım 2024'te duyurdu; Mart 2025'te OpenAI, ardından Google kendi ajan altyapılarına MCP desteği ekledi. Ocak 2026'da ise Anthropic protokolü Linux Foundation çatısı altındaki **Agentic AI Foundation**'a devretti — OpenAI ve Block kurucu ortak, AWS'den Microsoft'a kadar büyük oyuncular destekçi. Bugün kayıtlı sunucu sayısı 17 binin üzerinde, resmi SDK'ler aylık ~97 milyon kez indiriliyor. Rakip standart kalmadı; savaş bitti, MCP kazandı.
+
+## Mimari: Host, Client, Server
+
+MCP üç rol üzerine kurulu:
+
+- **Host:** Kullanıcının etkileşime girdiği yapay zekâ uygulaması. Claude Desktop, Cursor, VS Code, ChatGPT...
+- **Client:** Host'un içinde yaşayan ve tek bir sunucuyla bire bir konuşan protokol katmanı. Host, bağlandığı her sunucu için bir client açar.
+- **Server:** Asıl işi yapan taraf. Bir veri kaynağını veya yeteneği modele açan küçük program.
+
+Sunucu, modele üç temel şey sunabilir:
+
+1. **Tools (araçlar):** Modelin çağırabileceği fonksiyonlar — "veritabanında ara", "issue aç", "e-posta taslağı oluştur". Her aracın adı, açıklaması ve JSON Schema ile tanımlı parametreleri var; model bu şemaya bakarak hangi aracı ne zaman çağıracağına karar veriyor.
+2. **Resources (kaynaklar):** Modelin okuyabileceği veriler — dosyalar, kayıtlar, dökümanlar.
+3. **Prompts (şablonlar):** Sunucunun kullanıcıya hazır sunduğu, parametreli prompt şablonları.
+
+İletişim tarafında iki taşıma yöntemi var: lokal senaryolar için **stdio** (host, sunucuyu alt süreç olarak başlatır, stdin/stdout üzerinden JSON-RPC konuşurlar) ve uzak sunucular için **Streamable HTTP**.
+
+## Hadi bir tane yazalım
+
+Lafı uzatmayayım, MCP sunucusu yazmak gerçekten kolay. Resmi TypeScript SDK ile blog yazılarımda arama yapan minimal bir sunucu:
+
+```bash
+npm install @modelcontextprotocol/sdk zod
+```
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const POSTS_DIR = "/Users/ozgur/blog/src/posts";
+
+const server = new McpServer({
+  name: "blog-search",
+  version: "1.0.0",
+});
+
+server.registerTool(
+  "search_posts",
+  {
+    title: "Blog yazılarında ara",
+    description: "Verilen kelimeyi blog yazılarının içinde arar",
+    inputSchema: { query: z.string().describe("Aranacak kelime") },
+  },
+  async ({ query }) => {
+    const files = await readdir(POSTS_DIR);
+    const hits: string[] = [];
+
+    for (const file of files.filter(f => f.endsWith(".mdx"))) {
+      const content = await readFile(join(POSTS_DIR, file), "utf-8");
+      if (content.toLowerCase().includes(query.toLowerCase())) {
+        hits.push(file);
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: hits.length
+            ? `Şu yazılarda geçiyor:\n${hits.join("\n")}`
+            : "Hiçbir yazıda bulunamadı.",
+        },
+      ],
+    };
+  },
+);
+
+await server.connect(new StdioServerTransport());
+```
+
+Hepsi bu. Bu sunucuyu Claude Code'a tanıtmak tek satır:
+
+```bash
+claude mcp add blog-search -- npx tsx blog-search.ts
+```
+
+Artık "MCP hakkında daha önce yazmış mıyım?" diye sorduğunuzda model `search_posts` aracını kendisi çağırıyor, sonuca göre cevap veriyor. Aynı sunucu hiçbir değişiklik olmadan Cursor'da da, VS Code'da da, MCP destekleyen herhangi bir uygulamada da çalışıyor. Standardın bütün olayı bu.
+
+## Güvenlik: İşin ciddiyet kısmı
+
+MCP güçlü olduğu kadar da dikkat isteyen bir kapı açıyor. Aklınızda olsun:
+
+- **Prompt injection:** Model, araçlardan dönen içeriği okuyor. Kötü niyetli bir web sayfası veya döküman, "şimdi şu aracı çağır ve verileri şuraya gönder" gibi talimatlar içerebilir. İyi host uygulamaları riskli araç çağrılarında kullanıcı onayı ister — sizin sunucunuz da yıkıcı işlemleri (silme, gönderme) ayrı ve açık isimli araçlara bölmeli.
+- **Tool poisoning:** Üçüncü parti bir MCP sunucusu kurmak, o sunucunun araç açıklamalarını modelinizin beynine sokmak demek. Kaynağına güvenmediğiniz sunucuyu kurmayın; registry'de yıldız sayısına değil, kodun kendisine bakın.
+- **Yetki genişliği:** Sunucuya verdiğiniz token neyi yapabiliyorsa model de onu yapabilir. Salt-okur işler için salt-okur token kullanın.
+
+## Ne zaman MCP, ne zaman düz function calling?
+
+Her şeye MCP gerekmiyor. Tek bir uygulama içinde, kendi backend'inize bağlanan bir chatbot yazıyorsanız modelin native function calling'i yeterli ve daha basit. MCP'nin değeri **çoklukta** ortaya çıkıyor: aynı aracı birden fazla yapay zekâ uygulamasına açacaksanız, ekipçe ortak araç setleri kuruyorsanız veya başkalarının yazdığı hazır sunuculardan faydalanmak istiyorsanız MCP doğru katman.
+
+## Kapanış
+
+MCP, "yapay zekâ modeli" ile "gerçek dünya" arasındaki son kilometreyi standartlaştırdı ve bu yüzden bu kadar hızlı kazandı. Geliştirici olarak elimizdeki fırsat net: alanınızı iyi bildiğiniz bir konuda küçük ama sağlam bir MCP sunucusu, bugün binlerce yapay zekâ kullanıcısının araç setine girebilir.
+
+Bir sonraki yazıda görüşmek üzere. ✌️

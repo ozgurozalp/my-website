@@ -1,0 +1,88 @@
+---
+title: TypeScript 7 Çıktı! Go ile Yeniden Yazılan Derleyici Neden Bu Kadar Hızlı?
+description: TypeScript tarihinin en büyük değişimi yaşandı. Derleyici artık JavaScript ile değil, Go ile çalışıyor ve kabaca 10 kat daha hızlı. Bu yazıda neyin değiştiğini, neden Go seçildiğini ve projenizi geçirirken nelere dikkat etmeniz gerektiğini anlatıyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/typescript-7.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - typescript
+  - go
+  - tsgo
+  - derleyici
+  - performans
+---
+
+8 Temmuz 2026, TypeScript tarihinin muhtemelen en önemli günüydü: **TypeScript 7.0** yayınlandı ve derleyici artık TypeScript ile değil, **Go** ile yazılmış durumda. Evet, yanlış okumadınız — `tsc` komutunu çalıştırdığınızda artık bir JavaScript programı değil, native bir binary çalışıyor.
+
+Microsoft bu projeye 2025 baharında **"Corsa"** kod adıyla başlamıştı ve Anders Hejlsberg (TypeScript'in ve C#'ın yaratıcısı) ilk duyuruda kabaca 10 kat hız artışından bahsediyordu. Bir yıl sonra proje önce Release Candidate oldu, Temmuz'da da stabil sürüm geldi.
+
+Peki bu ne demek, neden yapıldı ve sizin projeniz için ne anlama geliyor? Tek tek bakalım.
+
+## Sorun neydi?
+
+TypeScript derleyicisi bugüne kadar kendi diliyle, yani TypeScript ile yazılıyordu (buna self-hosting deniyor). Şık bir mühendislik geleneği olsa da pratik bir bedeli vardı: derleyici, sonuçta **JavaScript olarak** çalışıyordu. Yani:
+
+- **JIT ısınması:** Node.js her `tsc` çalıştırdığınızda kodu önce yorumluyor, sıcak yolları sonradan optimize ediyor. Kısa ömürlü CLI süreçleri için en kötü senaryo.
+- **Tek iş parçacığı:** JavaScript'in doğası gereği tip denetimi tek thread üzerinde koşuyordu. 16 çekirdekli makinenizde `tsc` çalışırken 15 çekirdek boş oturuyordu.
+- **Çöp toplayıcı baskısı:** Milyonlarca küçük AST düğümü, JS nesne modeliyle temsil edilince bellek kullanımı şişiyor, GC sürekli devreye giriyordu.
+
+Küçük projelerde bunlar hissedilmez. Ama VS Code, monorepo'lar veya tip-ağır kütüphaneler (tRPC, Zod, Prisma tarzı) devreye girince `tsc --noEmit` süreleri dakikalara uzayabiliyordu.
+
+## Çözüm: Port, rewrite değil
+
+Microsoft'un bu konuda çok dikkatli kullandığı bir ifade var: bu bir **port**, yeniden yazım değil. Yani derleyicinin mimarisi ve tip denetimi semantiği olduğu gibi Go'ya taşındı. Amaç, davranışı birebir korumak: 6.x serisinde kodunuz nasıl derleniyorsa 7.0'da da aynı şekilde derlenmeli, aynı hataları aynı mesajlarla vermeli.
+
+### Neden Go? Rust değil?
+
+Bu soru duyuru gününden beri tartışılıyor. Ekibin gerekçesi gayet pragmatik:
+
+1. **Mevcut kod tabanına benzerlik.** Derleyici zaten fonksiyonel-imperatif bir stille, sınıf hiyerarşisi olmadan yazılmıştı. Go'nun struct'ları ve fonksiyonları bu yapıya neredeyse bire bir eşleniyor; Rust'a geçiş ise ownership modeli yüzünden mimariyi baştan düşünmeyi gerektirecekti.
+2. **Çöp toplayıcı.** Derleyiciler graf yapılarıyla çalışır ve bu graflarda kimin neyin sahibi olduğu belirsizdir. Go'nun GC'si burada engel değil, kolaylık.
+3. **Paylaşımlı bellekli paralellik.** Goroutine'ler sayesinde parse, tip denetimi ve emit adımları çekirdeklere dağıtılabiliyor.
+
+## Gerçekte ne kadar hızlı?
+
+Microsoft'un kendi ölçümlerinde VS Code gibi dev kod tabanlarında proje yükleme ve tam derleme sürelerinde ~8-10x arası iyileşme var. Bağımsız ölçümler ise tip-ağır projelerde **3.9x ile 7.3x** arası rakamlar veriyor. Yani "her projede tam 10 kat" değil; ama en kötü senaryoda bile birkaç kat hız, editörde ise hissedilir derecede anında tepki söz konusu. Bellek kullanımı da kabaca yarıya iniyor.
+
+Benim gibi CI'da her push'ta `tsc --noEmit` koşturan biriyseniz bu, dakikalarca beklediğiniz adımın çay demleme süresinden kahve karıştırma süresine inmesi demek.
+
+## Geçiş: Çoğu proje için sadece sürüm numarası
+
+Preview döneminde ayrı bir paket (`@typescript/native-preview`) ve ayrı bir komut (`tsgo`) vardı. 7.0 ile birlikte bunlar tarihe karıştı — native derleyici artık bildiğiniz `typescript` paketinin ve `tsc` komutunun kendisi:
+
+```bash
+npm install -D typescript@7
+npx tsc --version
+```
+
+`tsconfig.json` olduğu gibi çalışıyor, çıkan JavaScript aynı. Çoğu Next.js / React / Node projesi için geçiş gerçekten bundan ibaret.
+
+Bu arada 6.x serisi de ölmedi: JavaScript tabanlı derleyici **TypeScript 6** hattı olarak bir süre daha yaşayacak ve 7'ye geçemeyen projeler için köprü görevi görecek. Semantik iki hatta da aynı tutuluyor.
+
+## Dikkat: Herkes geçemiyor (henüz)
+
+Kritik bir eksik var: 7.0, eski derleyicinin **public compiler API'sini** henüz sunmuyor. Bu da şu anlama geliyor:
+
+- **Vue, Svelte, Astro, Angular** gibi kendi template dosyalarını TypeScript API'siyle denetleyen framework'lerin tooling'i henüz 7 ile çalışmıyor.
+- `ts-morph`, custom transformer'lar, TypeScript API'sine dokunan lint kuralları gibi araçlar da 6.x hattında beklemek zorunda.
+
+Yani elinizde Nuxt/Vue projesi varsa (benim taş kağıt makas oyunumun web tarafı gibi) bir süre daha 6.x'te kalacaksınız. Saf React/Node/Next.js projeleri için ise yol açık.
+
+## Pratik önerim
+
+1. Önce CI'da deneyin: ayrı bir branch'te `typescript@7`'ye çıkın, `tsc --noEmit` çıktısını 6.x ile karşılaştırın. Davranış birebir olmalı; fark görürseniz bu bir bug'dır ve raporlamaya değer.
+2. Editör deneyimi için VS Code'da workspace TypeScript sürümünü 7'ye çevirin — asıl "vay be" anı editörün açılış hızında yaşanıyor.
+3. Compiler API'ye bağımlı bir aracınız var mı diye `package.json`'ı tarayın; varsa o araç 7 desteği duyurana kadar bekleyin.
+
+## Kapanış
+
+TypeScript 7, "derleyici hangi dille yazılır" tartışmasına sektörün verdiği en net cevaplardan biri: kullanıcıların yazdığı dil ile aracın yazıldığı dilin aynı olması gerekmiyor. On yıllık bir kod tabanını davranışı bozmadan başka bir dile taşımak sıradan bir iş değil — ve görünen o ki başarmışlar.
+
+Şimdi izin verirseniz gidip CI süremin kaç saniyeye düştüğüne bir daha bakacağım. 😊
