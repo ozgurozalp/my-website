@@ -1,0 +1,165 @@
+---
+title: OctaneJS Nedir? React API'si Var, Virtual DOM Yok
+description: Inferno'nun yaratıcısı ve React katkıcısı Dominic Gannaway, virtual DOM kullanmayan ama React'in hook API'sini birebir koruyan yeni bir framework yayınladı. Bu yazıda OctaneJS'i bol kod örneğiyle ve React'ten farklarıyla inceliyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/octanejs.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - js
+tags:
+  - octanejs
+  - react
+  - javascript
+  - derleyici
+  - frontend
+  - performans
+---
+
+Frontend dünyasında yeni framework duyunca çoğumuzun refleksi aynı: "Bir tane daha mı?" Ama [OctaneJS](https://octanejs.dev/)'e o refleksle geçmeyin, çünkü arkasındaki isim **Dominic Gannaway** — Inferno'nun yaratıcısı ve React çekirdeğine katkı vermiş bir geliştirici. Yani React'i dışarıdan eleştiren biri değil; içini bilen ve nerelerinin pahalı olduğunu bizzat görmüş biri.
+
+İddia tek cümle: **React'in programlama modelini koru, çalışma zamanı maliyetini derleyiciye yedir.** Bileşenler ahead-of-time derlenip template klonlarına ve doğrudan DOM yazma komutlarına dönüşüyor. Çalışma zamanında virtual DOM da yok, diffing de — hangi state değişince hangi DOM düğümünün güncelleneceği derleme anında zaten belli.
+
+Kulağa Svelte/Solid gibi geliyor, farkında mısınız? Doğru — ama OctaneJS'in farkı bunu **React'in bildiğiniz API'siyle** yapması. Lafı uzatmadan koda geçelim.
+
+## Sıfır fark: Tanıdık bileşen
+
+```tsx
+import { useState } from "octane";
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      Tıklama: {count}
+    </button>
+  );
+}
+```
+
+Bu bir React bileşeninden ayırt edilemiyor. `useState`, `useEffect`, `useMemo`, `useRef`, `useContext`, `useTransition`, `memo`, context, portal, Suspense — hepsi aynı isimle, aynı sözleşmeyle var. Asıl eğlence farklarda başlıyor.
+
+## Fark 1: useState üçlü döndürüyor
+
+React'te asenkron bir callback içinde bayat (stale) state okumak klasik tuzaktır ve çözüm genelde bir ref senkronlamaktır. Octane bunu API'ye gömmüş — `useState`'in üçüncü elemanı, render tetiklemeden **en güncel** değeri okuyan bir getter:
+
+```tsx
+const [count, setCount, getCount] = useState(0);
+
+async function handleSave() {
+  await api.save();
+  // React'te buradaki `count` closure'daki eski değerdir.
+  // getCount() ise her zaman en son planlanan state'i verir:
+  console.log("Kayıt sonrası:", getCount());
+}
+```
+
+Derleyici de akıllı davranıyor: üçüncü elemanı destructure etmezseniz getter hiç üretilmiyor, klasik ikili kullanım maliyetsiz kalıyor.
+
+## Fark 2: Dependency array yazmak opsiyonel
+
+React'te `useEffect`'in bağımlılık dizisi, `exhaustive-deps` lint kuralıyla birlikte muhtemelen en çok tartışılan API. Octane'de ikinci argümanı hiç yazmazsanız derleyici bağımlılıkları closure'dan kendisi çıkarıyor:
+
+```tsx
+// React:
+useEffect(() => {
+  document.title = `${user.name} - ${unreadCount} yeni mesaj`;
+}, [user.name, unreadCount]); // elle yaz, lint'le boğuş
+
+// Octane:
+useEffect(() => {
+  document.title = `${user.name} - ${unreadCount} yeni mesaj`;
+}); // bağımlılıklar derleyicide: user.name, unreadCount
+```
+
+Analiz; setter'ların, dispatcher'ların, ref'lerin ve state getter'larının stabil olduğunu da biliyor, onları gereksiz yere bağımlılık saymıyor. Dizi yazarsanız React semantiği aynen korunuyor; `null` verirseniz "her render'da çalış" anlamına geliyor. React Compiler'ın vaadi, burada dilin doğal davranışı.
+
+## Fark 3: Rules of hooks yok
+
+React hook'ları çağrı sırasına göre takip ettiği için koşullu hook yazamazsınız. Octane'de hook'lar derleyicinin atadığı çağrı-noktası slotlarıyla izleniyor, sıra önemsiz:
+
+```tsx
+function Panel({ isAdmin }: { isAdmin: boolean }) {
+  if (!isAdmin) return <p>Yetkin yok.</p>;
+
+  // React'te bu satır kural ihlali. Octane'de gayet normal:
+  const [logs, setLogs] = useState<string[]>([]);
+
+  return <AdminLogs logs={logs} onClear={() => setLogs([])} />;
+}
+```
+
+Tek kısıt: hook'ları düz JS döngüsüne koyamıyorsunuz (her iterasyon aynı slotu paylaşırdı). Listeler için ya alt bileşen çıkarıyorsunuz ya da birazdan geleceğimiz `@for` direktifini kullanıyorsunuz.
+
+## Fark 4: .tsrx ve @for ile liste render'ı
+
+Standart `.tsx` desteğinin yanında Octane, derleyiciye daha agresif izinler veren `.tsrx` formatı sunuyor. Listelerde `map` yerine anahtarlı `@for` direktifi devreye giriyor:
+
+```txt
+@for (const todo of todos; key todo.id) {
+  <TodoItem todo={todo} />
+} @empty {
+  <p>Henüz görev yok.</p>
+}
+```
+
+Bu, çalışma zamanında satır başına descriptor üretmek yerine anahtarlı bir hızlı yola derleniyor; `@empty` bloğu da "liste boşsa" durumunu ayrıca ele almanıza gerek bırakmıyor.
+
+## Fark 5: Render sırasında promise oluşturmak serbest
+
+React'te `use()` ile veri çekerken promise'i render dışında oluşturup `cache()` ile sarmanız gerekir; yoksa her render yeni istek atar. Octane'de render sırasında promise oluşturmak **desteklenen** kalıp — derleyici, promise'i girdilerine göre memoize ediyor:
+
+```tsx
+function Profile({ userId }: { userId: string }) {
+  // Sadece userId değişince yeniden fetch edilir:
+  const user = use(fetchUser(userId));
+  const avatar = use(fetchUser(userId).then(u => u.thumbnail()));
+
+  return <img src={avatar} alt={user.name} />;
+}
+```
+
+Birbirinden bağımsız `use()` okumaları paralel başlıyor ve topluca suspend oluyor — şelale (waterfall) derdine derleyici seviyesinde çözüm.
+
+## Fark 6: Sentetik event yok, onChange da yok
+
+Octane event handler'ları React'in sentetik event katmanı yerine doğrudan native, delegated DOM event'lerine bağlıyor. Günlük hayattaki en önemli yansıması: React'in her tuşta tetiklenen `onChange`'i Octane'de yok. Her düzenlemede state güncellemek için native karşılığı olan `onInput` kullanıyorsunuz; native `change` ise tarayıcının bildiği gibi genelde blur'da tetikleniyor:
+
+```tsx
+<input
+  value={name}
+  onInput={(e) => setName(e.currentTarget.value)}
+/>
+```
+
+Controlled/uncontrolled davranış ise React ile birebir aynı: `value`/`checked` DOM'u yönetiyor, `defaultValue`/`defaultChecked` kaçış kapısı.
+
+Bir bonus API: prop'tan türeyen ama kullanıcı tarafından düzenlenebilen değerler için `useLinkedState` var — kaynak değişince değer otomatik sıfırlanıyor, "props'u state'e kopyalayıp effect ile senkronla" kalıbına gerek kalmıyor.
+
+## Fark 7: Hydration'ı sen planlıyorsun
+
+SSR sonrası her şeyi hemen hydrate etmek yerine, `Hydrate` bileşeniyle sınır sınır strateji belirleyebiliyorsunuz:
+
+```tsx
+import { Hydrate } from "octane";
+import { visible } from "octane/hydration";
+
+<Hydrate when={visible()}>
+  <CommentSection />
+</Hydrate>
+```
+
+`when` stratejileri arasında `load()`, `idle()`, `visible()`, `media()`, `interaction()` var; derleyici bu sınırların kodunu varsayılan olarak ayrı chunk'a bölüyor (`split`), istersen `prefetch` ile önden ısıtıyorsun. Astro'nun island mimarisini React modelinin içine gömülmüş düşünün.
+
+## Olgunluk durumu ve dürüst değerlendirme
+
+Framework `@octanejs/*` scope'u altında routing, state, form, animasyon ve test paketleriyle geliyor; kod tabanında 3.900'den fazla test var. Ama net olalım: **OctaneJS şu an alpha.** Üretim projenizi bugün taşımak için değil, yönü görmek için bakın.
+
+Peki React'in yerini alır mı? Kısa vadede hayır — ama bence doğru soru bu değil. Frontend topluca "çalışma zamanında akıllı ol" modelinden "derleme anında akıllı ol" modeline kayıyor: React Compiler, Svelte 5 rune'ları, Solid'in fine-grained reaktivitesi ve şimdi OctaneJS. Octane'in bahsi, bu geçişi React geliştiricisine **neredeyse hiçbir yeni kavram öğretmeden** yaptırabilmek.
+
+React bilginizle ilk bileşeni yazmak beş dakika sürmüyor; [octanejs.dev](https://octanejs.dev/)'den deneyebilirsiniz. Ben bir side-project'te denemeye başladım bile — sonuçları büyük ihtimalle yine burada yazarım. 😊

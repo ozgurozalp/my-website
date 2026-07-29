@@ -1,0 +1,62 @@
+---
+title: MCP Stateless Oluyor! 2026-07-28 Spesifikasyonu Ne Değiştiriyor?
+description: Model Context Protocol'ün yeni spesifikasyonu yayınlandı ve protokolün çekirdeği artık stateless. Bu yazıda handshake'in kaldırılmasını, MRTR modelini, header tabanlı yönlendirmeyi ve MCP sunucusu geliştirenler için pratikte nelerin değiştiğini inceliyorum.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/mcp-spec-2026.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - ai
+tags:
+  - mcp
+  - yapay-zeka
+  - llm
+  - protokol
+  - mimari
+---
+
+Dün [MCP nedir yazısında](/blog/mcp-nedir-model-context-protocol-rehberi) protokolün temellerini anlatmıştım; bugün de taze bir gelişme üzerinden devam ediyorum. MCP ekibi, [2026-07-28 spesifikasyon sürümünü duyurdu](https://blog.modelcontextprotocol.io/posts/2026-07-28/) ve bu sıradan bir sürüm değil: protokolün çekirdeği **stateful'dan stateless'a** geçiyor. Dört resmi SDK (TypeScript, Python, Go, C#) yeni sürümü şimdiden destekliyor; Rust SDK de beta olarak kervana katıldı.
+
+Neden bu kadar önemli? Çünkü bu değişiklik, MCP'nin "geliştirici bilgisayarında çalışan hobi aracı" kimliğinden "üretimde ölçeklenen altyapı" kimliğine resmen geçişi. Gelin maddelere bakalım.
+
+## Handshake öldü, yaşasın kendi kendini tanımlayan istekler
+
+Bugüne kadar bir MCP oturumu el sıkışmayla başlıyordu: istemci `initialize` çağrısı yapar, sunucu yeteneklerini söyler, oturum kimliği oluşur ve sonraki her istek bu oturuma bağlanırdı. Lokal stdio senaryosunda hiç sorun değil — alt süreç zaten sizin, durum bellekte.
+
+Ama uzak sunucularda bu model tam bir baş ağrısıydı. Oturum durumu bir sunucu instance'ında yaşadığı için load balancer arkasında N tane instance koyduğunuzda ya sticky session ya da paylaşımlı bir durum deposu (Redis gibi) gerekiyordu. Ben bunu taş kağıt makas oyunumun Socket.IO altyapısında bizzat yaşıyorum — Redis adapter tam da bu yüzden var. Gerçek zamanlı bir oyun için bu bedel kaçınılmaz; ama "aracı çağır, cevabı al" iş modeline sahip MCP için gereksiz yüktü.
+
+Yeni spesifikasyonda `initialize`/`initialized` el sıkışması ve oturum kimlikleri tamamen kaldırıldı. Her istek; protokol sürümünü, istemci kimliğini ve yeteneklerini metadata içinde kendisi taşıyor. Sonuç: herhangi bir istek herhangi bir instance'a düşebilir, paylaşımlı depo gerekmez. Sunucularınızı sıradan stateless HTTP servisi gibi yatayda ölçekleyebilirsiniz — serverless'a bile rahat oturur.
+
+## MRTR: Sunucu soru sormak için artık akış tutmuyor
+
+Eski modelde sunucu, işlem ortasında kullanıcıdan girdi istemek için (elicitation) istemciye doğru istek gönderebiliyordu — bu da açık bir stream gerektiriyordu. Stateless dünyada açık stream olmayacağına göre yeni bir mekanizma gerekti: **Multi Round-Trip Requests (MRTR)**.
+
+Mantık şu: sunucu, kullanıcıdan bilgi gerekiyorsa isteği `input_required` sonucuyla bitiriyor ve neye ihtiyacı olduğunu söylüyor. İstemci kullanıcıdan cevabı alıp isteği bu cevapla **yeniden** gönderiyor. Yani "bağlantıyı açık tut, ben sana sorarım" modelinden "eksik varsa söyle, ben tekrar gelirim" modeline geçiş. HTTP'nin kendi tarihine benzemesi tesadüf değil — stateless çekirdek + tekrar denenebilir istekler, ölçeklenen her protokolün vardığı nokta.
+
+## Gateway'ler için güzel haber: Header tabanlı yönlendirme
+
+Metod ve araç adları artık HTTP header'larında da taşınıyor (`Mcp-Method`, `Mcp-Name`). Küçük bir detay gibi duruyor ama şirket içi MCP gateway'i kuranlar için büyük konfor: yönlendirme ve yetkilendirme kararı için JSON gövdesini parse etmek zorunda değilsiniz. "Bu kullanıcı `delete_record` aracını çağırabilir mi?" sorusu artık body'e hiç bakmadan, edge'de cevaplanabiliyor.
+
+Bunun yanında araç/kaynak listeleri de önbelleklenebilir hale geldi: liste cevapları `ttlMs` ve `cacheScope` alanları taşıyor. Her oturumda `tools/list` çağırıp aynı cevabı almanın maliyeti nihayet ortadan kalkıyor.
+
+## Diğer önemli başlıklar
+
+- **Yetkilendirme sıkılaştı:** RFC 9207 issuer doğrulaması geldi; Dynamic Client Registration yerini Client ID Metadata Documents yaklaşımına bırakıyor ve kimlik bilgileri artık veren sunucuya bağlanıyor. Geçen yazıda "MCP'nin güvenlik tarafı ciddiyet ister" demiştim; ekip de aynı fikirde belli ki.
+- **Tasks resmi uzantı oldu:** Uzun süren işler için deneysel durumdaki Tasks, `tasks/get` ve `tasks/update` polling metodlarıyla resmi uzantıya dönüştü. Stateless dünyayla uyumlu: "işi başlat, arada sor" modeli.
+- **Vedalaşmalar:** Roots, Sampling, Logging ve eski HTTP+SSE taşıması resmen deprecated. Panik yok — en az 12 aylık geçiş pencereleri tanımlı.
+
+## Sunucu geliştirenler için pratik özet
+
+[Önceki yazıda](/blog/mcp-nedir-model-context-protocol-rehberi) yazdığımız gibi basit, SDK üzerinden giden bir sunucunuz varsa muhtemelen hiçbir şey yapmanıza gerek yok; SDK'yı güncellediğinizde protokol detayını o hallediyor. Elle transport yönetiyorsanız, oturum durumuna güveniyorsanız veya Sampling/Roots kullanıyorsanız 12 aylık pencereyi planlamaya şimdiden başlayın.
+
+Bir de ölçek verisi: dört Tier 1 SDK'nın toplam indirmesi ayda ~500 milyona ulaşmış; TypeScript ve Python SDK'ları tek başlarına 1'er milyar toplam indirmeyi geçmiş durumda. Kasım 2024'te duyurulan bir protokol için iki yıldan kısa sürede gelinen nokta bu.
+
+## Kapanış
+
+Bu sürüm, MCP'nin olgunlaşma hikayesindeki en net dönemeç: hobi projelerinin toleranslı dünyasından, load balancer'ların ve güvenlik ekiplerinin acımasız dünyasına bilinçli bir geçiş. Protokol tasarımıyla ilgileniyorsanız [orijinal duyuruyu](https://blog.modelcontextprotocol.io/posts/2026-07-28/) mutlaka okuyun — stateless mimariye geçişin gerekçeleri ders niteliğinde.
+
+Görüşmek üzere. ✌️
