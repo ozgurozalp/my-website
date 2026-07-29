@@ -1,0 +1,189 @@
+---
+title: LLM Nedir? Büyük Dil Modelleri Gerçekte Nasıl Çalışır?
+description: Token'dan attention mekanizmasına, eğitim aşamalarından halüsinasyona kadar büyük dil modellerinin altında ne olduğunu anlatıyorum. Türkçe'nin neden daha pahalı olduğu, bağlam penceresi, araç kullanımı ve API'yle ilk isteğin nasıl atılacağı dahil.
+createdAt: 2026-07-29
+updatedAt: 2026-07-29
+coverImage: /images/llm-nedir.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - ai
+tags:
+  - llm
+  - yapay-zeka
+  - token
+  - transformer
+  - claude
+  - api
+---
+
+Son üç yıldır sektörde konuşulan neredeyse her şeyin altında aynı üç harf var: **LLM** — Large Language Model, yani büyük dil modeli. Çoğumuz günlük olarak kullanıyoruz ama "peki bu şey içeride ne yapıyor?" sorusuna verilen cevaplar genelde ya "yapay zeka işte" seviyesinde kalıyor ya da doğrudan akademik makaleye çarpıyor.
+
+Bu yazıda arayı doldurmaya çalışacağım: bir LLM'in içinde ne olduğunu, neden bazen uydurduğunu, Türkçe kullanınca neden daha pahalıya geldiğini ve geliştirici olarak API'yle nasıl konuşacağınızı anlatacağım.
+
+## Tek cümlelik cevap
+
+Bir LLM, **bir metin dizisindeki bir sonraki parçayı tahmin etmek** üzere eğitilmiş devasa bir sinir ağıdır. Hepsi bu.
+
+Bu cümle ilk duyulduğunda hayal kırıklığı yaratıyor — "yani gelişmiş bir otomatik tamamlama mı?" Teknik olarak evet. Ama şu ayrıntı işi değiştiriyor: bir metnin devamını gerçekten iyi tahmin edebilmek için modelin dilbilgisini, olguları, mantık kurallarını, kod sözdizimini ve insanların nasıl akıl yürüttüğünü de öğrenmesi gerekiyor. "Türkiye'nin başkenti" ifadesini doğru tamamlamak için coğrafya bilmek zorundasınız. Yeterince büyük ölçekte, tahmin görevi bilgiyi zorunlu kılıyor.
+
+## Token: modelin gerçekten gördüğü şey
+
+Model harflerle de kelimelerle de çalışmıyor. **Token** denen ara birimlerle çalışıyor — bir kelime, kelime parçası, noktalama işareti ya da boşluk olabilir.
+
+İngilizce'de ortalama bir kelime yaklaşık 1,3 token. Türkçe'de ise durum bizim aleyhimize: dilimiz sondan eklemeli olduğu için "geliştiremediklerimizden" gibi tek bir kelime, tokenizer'ın gözünde birkaç parçaya bölünüyor. Aynı anlamı taşıyan bir metin Türkçe yazıldığında İngilizce'sinden **belirgin şekilde daha fazla token** tutuyor.
+
+Bunun iki somut sonucu var: aynı metin Türkçe olduğunda daha pahalıya mal oluyor, ve bağlam penceresine daha az içerik sığıyor.
+
+Buradan pratik bir uyarı: token saymak için `tiktoken` gibi araçlara uzanmayın — o OpenAI'nin tokenizer'ı ve başka modeller için yanlış sonuç verir, Türkçe gibi dillerde sapma daha da büyür. Doğrusu, kullandığınız modelin kendi sayım ucunu çağırmak:
+
+```typescript
+const { input_tokens } = await client.messages.countTokens({
+  model: "claude-opus-5",
+  messages: [{ role: "user", content: uzunMetin }],
+});
+```
+
+Faturayı da bağlam sınırını da belirleyen birim bu olduğu için, token'ı "modelin para birimi" gibi düşünmek yanlış olmaz.
+
+## Token'dan anlama: embedding'ler
+
+Her token, modele girmeden önce bir **vektöre** çevriliyor — yüzlerce ya da binlerce boyutlu bir sayı dizisi. Buna embedding deniyor.
+
+İşin güzel tarafı bu vektörlerin uzayda anlamlı biçimde konumlanması. Benzer anlamlı kelimeler birbirine yakın düşüyor; hatta aralarındaki *ilişkiler* de yön olarak korunuyor. "Kral" vektöründen "erkek" yönünü çıkarıp "kadın" yönünü eklediğinizde "kraliçe"ye yakın bir yere varıyorsunuz. Model bu ilişkileri kimse öğretmediği için değil, milyarlarca cümlede bu kelimelerin benzer bağlamlarda geçtiğini gördüğü için biliyor.
+
+## Transformer ve attention: asıl kırılma noktası
+
+2017'de yayınlanan "Attention Is All You Need" makalesi bugünkü her şeyin başlangıcı. Getirdiği fikir **self-attention**: modelin bir token'ı işlerken cümledeki diğer tüm token'lara aynı anda bakabilmesi ve her birine ne kadar "dikkat" edeceğine kendi karar vermesi.
+
+Şu cümleyi düşünün:
+
+> Çantayı masaya koydum çünkü **o** çok ağırdı.
+
+"O" neye işaret ediyor — çantaya mı masaya mı? İnsan olarak "ağır" kelimesinden çantayı anlıyorsunuz. Attention mekanizması tam bunu yapıyor: "o" token'ını işlerken "çanta" ve "ağır" token'larına yüksek ağırlık veriyor, geri kalanına düşük.
+
+Transformer'ın öncekilerden (RNN, LSTM) esas farkı ise hız: eski mimariler cümleyi kelime kelime, sırayla işlemek zorundaydı. Transformer bütün diziyi **paralel** işleyebiliyor. GPU'ların paralel hesaplamada iyi olması + paralel işlenebilen bir mimari = bugünkü ölçek. Devrimi mümkün kılan şey teorik zarafetten çok bu donanım uyumuydu.
+
+## Eğitim: iki farklı aşama
+
+**1. Ön eğitim (pre-training).** Model, internet ölçeğinde metin üzerinde tek bir görevle eğitiliyor: sonraki token'ı tahmin et. Aylar süren, binlerce GPU çalıştıran, maliyeti milyonlarca doları bulan kısım bu. Sonunda ortaya dili ve dünyayı bilen ama henüz "asistan" olmayan ham bir model çıkıyor — soru sorduğunuzda cevap yerine benzer sorular üretebiliyor, çünkü tek öğrendiği şey metnin nasıl devam ettiği.
+
+**2. Son eğitim (post-training).** Ham modeli kullanışlı hale getiren aşama. İki temel bileşeni var:
+
+- **Denetimli ince ayar (SFT):** İnsanların yazdığı örnek soru-cevap çiftleri gösteriliyor; model "soru gelince cevap verilir" formatını öğreniyor.
+- **Pekiştirmeli öğrenme (RLHF ve türevleri):** Modelin ürettiği cevaplar insanlar (veya insan tercihlerini öğrenmiş başka modeller) tarafından karşılaştırılıyor, model tercih edilen cevaplara doğru itiliyor.
+
+Kullandığınız modelin kişiliği, tonu, neyi reddedip neyi kabul ettiği — hepsi bu ikinci aşamanın ürünü.
+
+## Çıkarım: cevap nasıl üretiliyor?
+
+Siz bir soru yazdığınızda model tüm cevabı bir anda üretmiyor. Döngü şöyle:
+
+1. Bütün konuşmayı (sistem talimatı + geçmiş + sorunuz) girdi olarak alıyor.
+2. Sözlüğündeki **her token için bir olasılık** hesaplıyor.
+3. Bu dağılımdan bir token seçiyor.
+4. Seçtiği token'ı girdinin sonuna ekleyip 1. adıma dönüyor.
+
+Ekranda kelimelerin tek tek belirmesinin sebebi bu — gerçekten o anda üretiliyorlar. Ve modelin "tamamen aynı soruya farklı cevaplar vermesi" de 3. adımdaki seçimin olasılıksal olmasından geliyor.
+
+Son nesil modellerde bu döngünün üstüne bir katman daha var: **düşünme (thinking)**. Model cevabı yazmadan önce kendi kendine akıl yürütüyor, ve bu akıl yürütme adımları da token harcıyor. Zor problemlerde doğruluğu ciddi biçimde artırıyor; basit sorularda ise gereksiz maliyet. Bu yüzden modern API'ler "ne kadar düşünsün?" kararını size bırakan bir çaba (effort) ayarı sunuyor.
+
+## Bağlam penceresi: modelin çalışma belleği
+
+Bir LLM'in aynı anda "görebildiği" toplam token sayısına **bağlam penceresi** deniyor. Bugün üst seviye modellerde bu sayı **1 milyon token** — kabaca birkaç bin sayfa metin.
+
+Kritik nokta: bu bir bellek değil, bir pencere. Model konuşmalar arasında hiçbir şey hatırlamıyor; API tamamen durumsuz (stateless). Sohbet geçmişini her istekte baştan gönderiyorsunuz. ChatGPT veya Claude arayüzünde "hatırlıyor" gibi görünmesinin sebebi, uygulamanın perde arkasında tüm geçmişi tekrar tekrar göndermesi.
+
+Bu da maliyet sorunu doğuruyor: 50. mesajda ilk 49 mesajı da yeniden ödüyorsunuz. Çözüm **prompt caching** — değişmeyen ön ekleri (uzun sistem talimatı, doküman, araç tanımları) önbelleğe almak. Önbellekten okuma, normal girdinin yaklaşık **onda biri** fiyatına geliyor.
+
+Burada bir incelik var ve atlandığında önbellek sessizce hiç çalışmıyor: eşleşme **ön ek (prefix)** bazlı. İstemin başına `new Date()` ile tarih basıyorsanız, o tarih her istekte değiştiği için sonrasındaki her şeyin önbelleği geçersiz oluyor. Değişmeyen içerik başta, değişen içerik sonda — kural bu kadar basit ve bu kadar acımasız.
+
+## Halüsinasyon: neden uyduruyor?
+
+En çok şikayet edilen davranış, aslında mimarinin doğrudan sonucu.
+
+Model bir olgu veritabanı sorgulamıyor. Her adımda "bu bağlamda hangi token gelmeli?" sorusuna cevap veriyor. Bilmediği bir konuda da bu soruya cevap üretmek zorunda — ve **istatistiksel olarak makul görünen** bir devam üretiyor. Var olmayan bir kütüphane fonksiyonu, olmayan bir makale referansı, yanlış bir tarih... hepsi "doğru görünen metin" olarak üretiliyor, çünkü modelin ölçütü doğruluk değil olasılık.
+
+Bunu azaltmanın pratik yolları:
+
+- **Bağlamı siz verin.** Modelin hafızasına güvenmek yerine ilgili dokümanı isteme ekleyin (bu yaklaşımın adı RAG — retrieval-augmented generation).
+- **Araç verin.** Hesap makinesi, arama, veritabanı sorgusu — doğrulanabilir kaynaklar uydurmayı keser.
+- **Doğrulanabilir çıktı isteyin.** Kaynak, satır numarası, alıntı isteyin.
+- **Yapılandırılmış çıktı kullanın.** Şemaya bağlı JSON istediğinizde biçim serbestliği daralır.
+
+Ve en önemlisi: **kritik bilgiyi doğrulayın.** LLM'ler kendinden emin bir tonda yanılabilir; ton, doğruluğun göstergesi değil.
+
+## Araç kullanımı: modelin dış dünyaya açılması
+
+Modern LLM'lerin asıl gücü metin üretmekten çok **araç çağırabilmelerinde**. Modele bir fonksiyonun adını, açıklamasını ve parametre şemasını veriyorsunuz; model "şu an bu aracı çağırmalıyım" diye karar verip parametreleri üretiyor, siz çalıştırıp sonucu geri veriyorsunuz.
+
+Bugün "ajan" (agent) denen her şey bu döngünün üstüne kurulu. Araçların modele standart bir protokolle sunulması meselesini de [MCP yazımda](/blog/mcp-nedir-model-context-protocol-rehberi) ayrıca anlatmıştım — LLM'i gerçek bir iş aracına dönüştüren katman orası.
+
+## Hadi bir istek atalım
+
+Teorinin pratiği şaşırtıcı derecede kısa. Node.js tarafında resmi SDK ile:
+
+```bash
+npm install @anthropic-ai/sdk
+```
+
+Kurulum bittiğine göre ilk isteği atabiliriz:
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk";
+
+// API anahtarı ANTHROPIC_API_KEY ortam değişkeninden okunur
+const client = new Anthropic();
+
+const response = await client.messages.create({
+  model: "claude-opus-5",
+  max_tokens: 16000,
+  system: "Sen kısa ve net cevap veren bir asistansın.",
+  messages: [
+    { role: "user", content: "Taş kağıt makasın tarihini üç cümlede özetle." },
+  ],
+});
+
+// content bir blok dizisi — tipini kontrol etmeden .text'e uzanmayın
+for (const block of response.content) {
+  if (block.type === "text") {
+    console.log(block.text);
+  }
+}
+```
+
+Dikkat edilecek üç nokta var:
+
+**`system`** modelin rolünü belirler ve konuşma geçmişinden ayrı durur. **`messages`** tüm geçmişi taşır — devam eden bir sohbette önceki mesajları da bu diziye ekleyip her seferinde yeniden gönderirsiniz. **`content` bir dizidir**, düz metin değil: metin blokları, araç çağrıları, düşünme blokları aynı yanıtta bir arada gelebilir. `content[0].text` yazmak çalışıyor gibi görünüp ilk blok metin olmadığında elinizde patlar.
+
+## Model seçimi ve maliyet
+
+Aynı ailede farklı boyutlarda modeller olması tesadüf değil: her iş en güçlü modeli hak etmiyor. Temmuz 2026 itibarıyla Claude ailesi şöyle duruyor:
+
+| Model | ID | Bağlam | Giriş / Çıkış (1M token) |
+| ----- | -- | ------ | ------------------------ |
+| Claude Opus 5 | `claude-opus-5` | 1M | $5 / $25 |
+| Claude Sonnet 5 | `claude-sonnet-5` | 1M | $3 / $15 |
+| Claude Haiku 4.5 | `claude-haiku-4-5` | 200K | $1 / $5 |
+
+Çıkış token'ının girişten **beş kat pahalı** olduğuna dikkat edin — maliyet optimizasyonunda ilk bakılacak yer genelde uzun çıktılardır, uzun girdiler değil.
+
+Pratik yaklaşım: sınıflandırma, etiketleme, basit özet gibi işlerde en küçük modelle başlayın; kalite yetmediğinde yukarı çıkın. Karmaşık kod, uzun akıl yürütme ve ajan iş akışlarında ise doğrudan en yetenekli modelle başlamak genelde daha ucuza gelir, çünkü hatalı çıktıyı düzeltmek için harcanan tur sayısı düşer.
+
+## Ne yapamazlar?
+
+Dürüst bir bölüm olmadan bu yazı eksik kalır:
+
+- **Gerçek zamanlı bilgi yok.** Eğitim verisinin bir kesme tarihi var; sonrasını arama aracı olmadan bilemezler.
+- **Kalıcı hafıza yok.** Her konuşma sıfırdan başlar.
+- **Sayma ve hassas aritmetik zayıf.** "Bu metinde kaç 'a' var?" sorusu token mimarisi yüzünden beklenenden zordur. Hesap işini hesap makinesine devrettirin.
+- **Kendi bilmediğini bilmez.** Belirsizlik ifadesi de öğrenilmiş bir dil kalıbıdır; içsel bir "emin değilim" ölçeri yoktur.
+
+## Kapanış
+
+Bir LLM ne sihirli bir zeka ne de "sadece otomatik tamamlama". Yeterince büyük ölçekte, sonraki kelimeyi tahmin etme görevinin ortaya çıkardığı şaşırtıcı derecede kullanışlı bir örüntü makinesi. Nasıl çalıştığını bilmek, onu kullanırken nerede güvenip nerede doğrulayacağınızı da söylüyor — ki bugün bir geliştirici için asıl beceri o.
+
+Sonraki yazıda görüşmek üzere. 🧠
