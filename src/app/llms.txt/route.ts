@@ -2,6 +2,12 @@ import { posts } from "@/collections";
 
 const SITE_URL = "https://ozgurozalp.com";
 
+// Next 15'te route handler'lar varsayılan olarak dinamik. Dinamik kalırsa
+// üretimde istek anında src/posts/*.mdx okunmaya çalışılıyor — o dosyalar
+// sunucusuz pakette olmadığı için 500 dönüyordu. sitemap.ts gibi build
+// sırasında üretilsin: içerik zaten yalnızca deploy'da değişiyor.
+export const dynamic = "force-static";
+
 /**
  * llms.txt: dil modellerinin siteyi tararken okuyacağı özet.
  * Yazı listesi content'ten üretilir ki yeni yazı eklendiğinde elle
