@@ -1,0 +1,191 @@
+---
+title: OpenTofu Nedir? Terraform'dan Farkı ve Hangisini Seçmelisiniz
+description: HashiCorp Terraform'un lisansını BUSL'a çevirince topluluk projeyi fork'ladı ve OpenTofu doğdu. Bu yazıda lisans meselesinin ne anlama geldiğini, iki projenin nerede ayrıştığını, geçişin nasıl yapıldığını ve kimin hangisini seçmesi gerektiğini anlatıyorum.
+createdAt: 2026-07-30
+updatedAt: 2026-07-30
+coverImage: /images/opentofu.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - cloud
+tags:
+  - opentofu
+  - terraform
+  - iac
+  - devops
+  - lisans
+---
+
+10 Ağustos 2023'te HashiCorp tek bir duyuru yaptı ve altyapı dünyasında dokuz yıllık bir dengeyi bozdu: Terraform'un lisansı açık kaynak olmaktan çıkıyordu.
+
+Beş hafta sonra ortaya **OpenTofu** çıktı — Terraform'un son açık kaynak sürümünden fork'lanmış, bugün Linux Foundation çatısı altında geliştirilen bir proje.
+
+Aradan üç yıl geçti. Bu yazıda hem o gün ne olduğunu hem de bugün — Temmuz 2026 itibarıyla — iki proje arasındaki **gerçek** farkın ne olduğunu anlatacağım. Terraform'un kendisini merak ediyorsanız önce [Terraform nedir yazıma](/blog/terraform-nedir-altyapiyi-kodla-yonetmek) bakmanızı öneririm; burada temel kavramları bildiğinizi varsayıyorum.
+
+## Kısa cevap
+
+**OpenTofu, Terraform'un açık kaynak lisanslı devamıdır.** Aynı dili (HCL) konuşur, aynı provider'ları kullanır, aynı state formatını okur. Komut adı `terraform` yerine `tofu`.
+
+Farkı üç başlıkta toplanıyor: **lisans**, **yönetişim** ve — bu üç yılda oluşan — **özellik ayrışması**.
+
+## Önce lisans meselesi: BUSL ne demek?
+
+Terraform 2014'ten 2023'e kadar **MPL 2.0** lisanslıydı. Bu gerçek bir açık kaynak lisansı: kodu okur, değiştirir, dağıtır, üzerine ürün kurar, satarsınız.
+
+HashiCorp bunu **BUSL 1.1**'e (Business Source License) çevirdi. BUSL'un adında "license" geçiyor ama **açık kaynak değil** — Open Source Initiative'in tanımına uymuyor. Kaynak kodu görebilirsiniz, çoğu kullanım serbesttir, ama kritik bir kısıt var:
+
+> HashiCorp ile **rekabet eden** bir ürün üretemezsiniz.
+
+Buradaki asıl sorun kısıtın kendisi değil, **belirsizliği**. "Rekabet" tanımını yapan taraf HashiCorp. Altyapı otomasyonu üzerine bir SaaS yazıyorsanız, ürününüzün içine Terraform gömüyorsanız ya da müşterilerinize Terraform çalıştıran bir platform sunuyorsanız — bunun rekabet sayılıp sayılmayacağını önceden kesin olarak bilemezsiniz. Hukuk ekibi olan şirketler için bu, ürün planlanırken cevaplanması gereken bir risk kalemine dönüştü.
+
+BUSL'un bir de gecikmeli açılma maddesi var: her sürüm belirli bir süre sonra (Terraform'da dört yıl) MPL'ye döner. Ama dört yıl önceki bir altyapı aracıyla üretim yönetmek pratikte bir seçenek değil.
+
+**Not:** Bu değişiklik geriye dönük değil. Terraform 1.5.x ve öncesi hâlâ MPL 2.0. OpenTofu da tam olarak oradan, son MPL sürümünden fork'landı.
+
+## OpenTofu nasıl doğdu?
+
+Tepki hızlı ve organize oldu. Gruntwork, Spacelift, Harness, env0, Scalr gibi ekosistemde iş yapan şirketler bir manifesto yayınladı: proje fork'lanacak ve **tarafsız bir vakfa** bağışlanacaktı — bir daha aynı şeyin yaşanmaması için.
+
+Kritik nokta buydu. Fork sadece "lisansı geri alalım" hamlesi değildi; **yönetişimi tek bir şirketin elinden çıkarma** hamlesiydi.
+
+Bugünkü durum:
+
+- **Lisans:** MPL 2.0 (depodaki LICENSE dosyasından doğruladım)
+- **Yönetişim:** Linux Foundation
+- **CNCF:** Nisan 2025'te kabul edildi — Kubernetes, Prometheus ve Envoy ile aynı çatı
+
+Bu son madde önemli: CNCF'e girmek, projenin bir şirketin ticari kararına bağlı olmadığının kurumsal teyidi sayılıyor.
+
+## Aynı olan ne?
+
+Geçişi kolaylaştıran şey, temelin hiç değişmemiş olması:
+
+- **HCL sözdizimi** birebir aynı. `resource`, `variable`, `module`, `output` — hepsi aynı yazılır.
+- **Provider protokolü** aynı. **Her Terraform provider'ı OpenTofu'da çalışır**, tersi de geçerli. AWS, Azure, Cloudflare... hiçbirini değiştirmeniz gerekmez.
+- **State formatı** uyumlu.
+- **Komut isimleri** aynı: `init`, `plan`, `apply`, `destroy`.
+
+Yani OpenTofu öğrenmek diye ayrı bir iş yok. Terraform biliyorsanız OpenTofu biliyorsunuz.
+
+## Peki fark ne? Üç yılda ayrışan özellikler
+
+2023'te iki proje aynıydı. Bugün değil. OpenTofu'nun getirdiği ve Terraform'da karşılığı olmayan başlıklar:
+
+### State şifreleme (v1.7, 2024)
+
+Bu, en somut fark. [Terraform yazımda](/blog/terraform-nedir-altyapiyi-kodla-yonetmek) anlattığım gibi state dosyası içinde veritabanı parolaları, API anahtarları düz metin olarak durur. Terraform'un buna dair yerleşik bir çözümü yok — backend'in şifrelemesine (S3'ün `encrypt` seçeneği gibi) güvenmeniz gerekir, yani dosya diskte şifrelidir ama Terraform'un kendisi için düz metindir.
+
+OpenTofu ise **uçtan uca şifreleme** sunuyor: state, OpenTofu'dan çıkmadan önce şifreleniyor.
+
+```hcl
+terraform {
+  encryption {
+    key_provider "aws_kms" "anahtar" {
+      kms_key_id = "arn:aws:kms:eu-central-1:111122223333:key/..."
+      region     = "eu-central-1"
+      key_spec   = "AES_256"
+    }
+
+    method "aes_gcm" "yontem" {
+      keys = key_provider.aws_kms.anahtar
+    }
+
+    state {
+      method = method.aes_gcm.yontem
+    }
+  }
+}
+```
+
+AWS KMS, GCP KMS, OpenBao/Vault ve PBKDF2 (parola tabanlı) key provider'ları destekleniyor. Kontrol için: Terraform'un changelog'unda "state encryption" ifadesi **hiç geçmiyor**; OpenTofu'da ise aktif geliştirme sürüyor.
+
+### `-exclude` planlama seçeneği (v1.9)
+
+Terraform'da `-target` var: "sadece şunu uygula". Tersi yoktu.
+
+```bash
+# Bu kaynağı ve ona bağlı olan her şeyi hariç tut, gerisini uygula
+tofu plan -exclude=kubernetes_manifest.crds
+```
+
+Sorunlu tek bir kaynağı atlayıp geri kalanı uygulamak, `-target` ile tek tek saymaktan çok daha pratik.
+
+### OCI registry desteği (v1.10)
+
+Modülleri ve provider'ları OCI registry'den (Docker imajlarının durduğu yer) çekebiliyorsunuz. Zaten bir container registry'si olan kurumlar için ayrı bir modül sunucusu kurma derdini kaldırıyor.
+
+### Dinamik `prevent_destroy` (v1.12)
+
+Terraform'da `prevent_destroy` sabit bir değer olmak zorunda. OpenTofu'da değişkene bağlayabiliyorsunuz — yani production'da açık, staging'de kapalı olacak şekilde tek bir modül yazılabiliyor.
+
+> **Bir düzeltme:** Bu karşılaştırmayı yazarken provider'larda `for_each` özelliğini de "OpenTofu'ya özel" diye yazacaktım; her iki changelog'u kontrol edince **Terraform'a da geldiğini** gördüm. İnternette dolaşan karşılaştırma listelerinin çoğu 2024'te yazılmış ve güncellenmemiş — bu tip listelere körü körüne güvenmeyin, tarihine bakın.
+
+## Sürüm ve olgunluk durumu (Temmuz 2026)
+
+Rakamları doğrudan depolardan aldım:
+
+| | Terraform | OpenTofu |
+| --- | --- | --- |
+| Kararlı sürüm | v1.15.8 (8 Tem 2026) | v1.12.5 (21 Tem 2026) |
+| Geliştirmedeki sürüm | v1.16 beta, v1.17 alpha | v1.13 |
+| Lisans | BUSL 1.1 | MPL 2.0 |
+| Sahibi / yöneticisi | HashiCorp (IBM) | Linux Foundation / CNCF |
+
+**Sürüm numaralarını karşılaştırmayın** — Terraform 1.15'te, OpenTofu 1.12'de diye "OpenTofu geride" sonucu çıkarmak yanlış olur. İki proje 2023'ten beri kendi numaralandırmasını yürütüyor; aynı ölçeğin üstünde değiller.
+
+Olgunluk açısından OpenTofu artık deneysel bir proje değil: iki ayrı sürüm dalını (1.11 ve 1.12) eşzamanlı bakımda tutuyor, düzenli yama çıkarıyor.
+
+## Geçiş nasıl yapılır?
+
+Basitliği şaşırtıcı. Çoğu proje için:
+
+```bash
+# 1. OpenTofu'yu kur (macOS)
+brew install opentofu
+
+# 2. Aynı dizinde, terraform yerine tofu
+tofu init
+tofu plan
+```
+
+Bu kadar. `.tf` dosyalarınıza dokunmanız gerekmez, provider'lar aynı kalır. State dosyasında ilk `apply` sonrası yalnızca sürüm işareti değişir.
+
+Yine de dikkat edilecek üç şey var:
+
+**Geri dönüş tek yönlü olmayabilir.** OpenTofu'da `apply` çalıştırdıktan sonra state, OpenTofu sürümüyle işaretlenir. Terraform'a dönmek isterseniz state'i elle düzenlemeniz gerekebilir. **Önce state'in yedeğini alın.**
+
+**Ekipçe aynı anda geçin.** Yarısı `terraform`, yarısı `tofu` çalıştıran bir ekip, aynı state üzerinde sürüm uyuşmazlığı yaşar.
+
+**CI/CD ve araçları kontrol edin.** `hashicorp/setup-terraform` yerine `opentofu/setup-opentofu`; Atlantis, Terragrunt gibi araçların OpenTofu desteği var ama yapılandırmada değişiklik gerekebilir. Terraform Cloud / HCP Terraform kullanıyorsanız o taraf HashiCorp'a bağlı — alternatifiniz Spacelift, env0, Scalr gibi platformlar olur.
+
+## Hangisini seçmeli?
+
+Tek bir doğru cevap yok; duruma göre değişiyor.
+
+**OpenTofu'yu seçin, eğer:**
+
+- Ürününüzün içine altyapı aracı gömüyorsanız veya müşterilerinize altyapı otomasyonu satıyorsanız. BUSL'un "rekabet" kısıtı burada gerçek bir hukuki risk.
+- Kurumunuzun açık kaynak lisans politikası var ve BUSL onaylı listede değil. (Birçok büyük kurumda değil.)
+- State şifrelemesi ihtiyacınızsa. Terraform'da yerleşik karşılığı yok.
+- Aracınızın tek bir şirketin ticari kararına bağlı olmamasını önemsiyorsanız.
+
+**Terraform'da kalın, eğer:**
+
+- BUSL sizi engellemiyorsa — ki normal bir şirketin kendi altyapısını yönetmesi için engellemiyor.
+- HCP Terraform (eski adıyla Terraform Cloud) kullanıyorsanız ve kurumsal desteğe ihtiyacınız varsa.
+- Ekosistem genişliği kritikse: eğitim içerikleri, iş ilanları, üçüncü parti entegrasyonlar hâlâ ağırlıkla Terraform adını kullanıyor.
+
+**Yeni öğreniyorsanız:** hangisiyle başladığınızın hiçbir önemi yok. Dil aynı, kavramlar aynı, komutlar aynı. Birini öğrenen diğerini zaten biliyor.
+
+## Sonuç
+
+OpenTofu hikayesi aslında lisanstan çok **yönetişim** hikayesi. Altyapı araçları, üzerine tüm sistemini kurduğun temel taşlardır; o taşın sahibinin bir gün kuralları değiştirebilmesi, teknik değil kurumsal bir risktir. OpenTofu'nun asıl teklifi "daha iyi Terraform" değil, "kuralları tek bir şirketin değiştiremeyeceği Terraform".
+
+Pratik tavsiyem: bugün Terraform kullanıyorsanız ve BUSL sizi engellemiyorsa acele etmeyin — ama OpenTofu'yu radarınızda tutun ve yılda bir kez "hâlâ doğru araçta mıyım?" diye sorun. Geçiş maliyeti bugün çok düşük; ilerde ayrışma büyürse o kadar düşük kalmayabilir.
+
+Altyapı tarafında devam etmek isterseniz [Kubernetes nedir](/blog/kubernetes-nedir-ve-neden-kullanilir) ve [Node.js uygulamasını Kubernetes'e deploy etme](/blog/kubernetes-uzerinde-nodejs-express-uygulamasi-deploy-etme-vpsden-uretime-kapsamli-rehber) yazılarıma da bakabilirsiniz.
+
+Görüşmek üzere. 🧊

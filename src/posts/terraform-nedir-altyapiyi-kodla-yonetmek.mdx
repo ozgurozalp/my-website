@@ -1,0 +1,325 @@
+---
+title: Terraform Nedir? Altyapıyı Kodla Yönetmenin Kapsamlı Rehberi
+description: Sunucuyu panelden tıklayarak kurmanın nesi sorunlu, Terraform bunu nasıl çözüyor? State dosyasından provider'lara, modüllerden ekip çalışmasına kadar Terraform'u sıfırdan anlatıyorum — ve BUSL lisans değişikliğiyle doğan OpenTofu meselesini de.
+createdAt: 2026-07-30
+updatedAt: 2026-07-30
+coverImage: /images/terraform.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - cloud
+tags:
+  - terraform
+  - opentofu
+  - iac
+  - devops
+  - altyapi
+---
+
+Bir sunucuya ihtiyacınız oldu. Panele girdiniz, "Create Droplet" dediniz, bölgeyi seçtiniz, SSH anahtarını eklediniz, güvenlik duvarında 80 ve 443'ü açtınız. On dakika, iş bitti.
+
+Üç ay sonra aynısından bir tane daha lazım. Peki ilkinde tam olarak hangi ayarları seçmiştiniz? Firewall kuralı neydi? Hangi imaj sürümü? Panelde bakarsınız, çıkarmaya çalışırsınız, "galiba böyleydi" dersiniz. Ve iki sunucu aslında birbirinin aynısı olmaz.
+
+**Terraform tam olarak bu problemi çözüyor:** altyapıyı tıklayarak değil, kod yazarak tanımlıyorsunuz.
+
+## Terraform nedir?
+
+Terraform, HashiCorp tarafından geliştirilen bir **Infrastructure as Code (IaC)** aracı — Türkçesiyle "kod olarak altyapı". Sunucu, veritabanı, yük dengeleyici, DNS kaydı, S3 kovası gibi bulut kaynaklarını metin dosyalarında tanımlıyorsunuz; Terraform da bu tanımı gerçeğe dönüştürüyor.
+
+Temel fikir şu: **istenen son durumu (desired state) yazarsınız, oraya nasıl gidileceğini Terraform hesaplar.**
+
+Bu ayrım önemli. Bir bash betiği yazsaydınız adım adım "şunu kur, sonra bunu çalıştır" derdiniz — buna *imperatif* denir ve betiği ikinci kez çalıştırdığınızda ne olacağı belirsizdir. Terraform ise *deklaratif*: "üç sunucum olsun" dersiniz. Hiç yoksa üçünü kurar, iki tane varsa bir tane ekler, üç tane varsa hiçbir şey yapmaz.
+
+Bu özelliğe **idempotency** deniyor: aynı komutu kaç kez çalıştırırsanız çalıştırın sonuç aynı olur.
+
+## Neden gerekli?
+
+Panelden tıklayarak altyapı yönetmenin sorunları zamanla birikiyor:
+
+- **Tekrarlanamaz.** Aynı ortamı ikinci kez kurmak elle yapılan bir arkeoloji çalışmasına dönüşür.
+- **Kayıt yok.** Kim, ne zaman, neyi değiştirdi? Panelin log'u varsa bile "neden" sorusunun cevabı hiçbir yerde yazmaz.
+- **Drift.** Biri gece yarısı bir ayarı elle değiştirir, kimse bilmez; iki hafta sonra "staging'de çalışıyordu ama production'da çalışmıyor" der.
+- **Gözden geçirilemez.** Altyapı değişikliği bir pull request'e konu olamaz, ekip arkadaşınız inceleyemez.
+- **Geri alınamaz.** Yanlış giden bir değişikliği geri almak, ne yapıldığını hatırlamaya bağlıdır.
+
+Terraform bunların hepsini çözüyor, çünkü altyapı artık **git'te duran bir metin dosyası**. Kod neyse, altyapı da odur: sürümlenir, incelenir, geri alınır.
+
+## İlk örnek
+
+Terraform'un dili **HCL** (HashiCorp Configuration Language). JSON'a benzer ama insan için tasarlanmış — yorum satırı yazabiliyorsunuz, virgül derdi yok.
+
+Basit bir örnek — bir DigitalOcean sunucusu:
+
+```hcl
+terraform {
+  required_providers {
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
+  }
+}
+
+provider "digitalocean" {
+  token = var.do_token
+}
+
+resource "digitalocean_droplet" "web" {
+  name   = "web-1"
+  region = "fra1"
+  size   = "s-1vcpu-1gb"
+  image  = "ubuntu-24-04-x64"
+}
+
+output "sunucu_ip" {
+  value = digitalocean_droplet.web.ipv4_address
+}
+```
+
+Dört blok, dört farklı iş:
+
+**`terraform`** — Terraform'un kendisini yapılandırır: hangi provider'lar gerekli, hangi sürümler kabul edilebilir.
+
+**`provider`** — Hangi platformla konuşulacağını ve kimlik bilgilerini belirtir.
+
+**`resource`** — Asıl iş. `"digitalocean_droplet"` kaynağın *tipi*, `"web"` ise sizin verdiğiniz *yerel isim*. Bu ikisi birlikte `digitalocean_droplet.web` adresini oluşturur ve kodun başka yerinden buna referans verirsiniz.
+
+**`output`** — Terraform çalıştıktan sonra ekrana basılacak değer. Sunucunun IP'sini önceden bilemezsiniz; Terraform kurduktan sonra öğrenir ve size söyler.
+
+## Provider: Terraform neden her şeyi yönetebiliyor?
+
+Terraform'un kendisi AWS'yi, Azure'u ya da Cloudflare'i bilmiyor. Bildiği tek şey bir **eklenti protokolü**. Her platform için ayrı bir **provider** var ve provider o platformun API'siyle konuşmayı biliyor.
+
+Bugün 4.000'in üzerinde provider var. Sadece bulut sağlayıcıları değil: Cloudflare DNS, GitHub repoları, Datadog panoları, PostgreSQL kullanıcıları, hatta Spotify çalma listeleri. "API'si varsa provider'ı vardır" demek abartı sayılmaz.
+
+Bunun pratik sonucu: **tek bir dille tüm stack'inizi tanımlayabiliyorsunuz.** Sunucu AWS'de, DNS Cloudflare'de, hata takibi Sentry'de olabilir — hepsi aynı `.tf` dosyalarında yan yana durur ve aralarında referans verebilirler:
+
+```hcl
+resource "aws_instance" "api" {
+  ami           = "ami-0abcdef123"
+  instance_type = "t3.small"
+}
+
+# Cloudflare kaydı, AWS sunucusunun IP'sini doğrudan referans alıyor.
+# Terraform bağımlılığı kendisi anlar: önce sunucu, sonra DNS.
+resource "cloudflare_record" "api" {
+  zone_id = var.cloudflare_zone_id
+  name    = "api"
+  type    = "A"
+  value   = aws_instance.api.public_ip
+}
+```
+
+Burada sihirli olan kısım: siz "önce şunu, sonra bunu yap" demediniz. Terraform `aws_instance.api.public_ip` referansını görüp bağımlılık grafiğini kendisi çıkardı.
+
+## Terraform'un çalışma döngüsü
+
+Günlük kullanımda üç komut var.
+
+**`terraform init`** — Projeyi hazırlar. Kullandığınız provider'ları indirir, backend'i yapılandırır. Yeni bir projede veya provider ekledikten sonra bir kez çalıştırılır.
+
+**`terraform plan`** — **En değerli komut bu.** Hiçbir şeyi değiştirmez; sadece "şu an ne var, kodda ne yazıyor, aradaki farkı kapatmak için ne yapmam gerekir" hesabını yapar ve size gösterir:
+
+```text
+Terraform will perform the following actions:
+
+  # digitalocean_droplet.web will be updated in-place
+  ~ resource "digitalocean_droplet" "web" {
+        id     = "123456"
+      ~ size   = "s-1vcpu-1gb" -> "s-2vcpu-2gb"
+        name   = "web-1"
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.
+```
+
+Sondaki özet satırı, üretim ortamında hayat kurtarır. `0 to destroy` görmeyi beklerken `3 to destroy` görüyorsanız durun ve okuyun.
+
+Sembollerin anlamı: `+` oluşturulacak, `~` yerinde güncellenecek, `-` silinecek, `-/+` **silinip yeniden oluşturulacak**. Sonuncusu en tehlikelisidir — bazı alanlar değiştirilemez olduğu için Terraform kaynağı yok edip baştan kurar. Bir veritabanında bu, veri kaybı demektir.
+
+**`terraform apply`** — Planı uygular. Varsayılan olarak planı tekrar gösterir ve onay ister.
+
+Bir de **`terraform destroy`** var: kodda tanımlı her şeyi siler. Geçici test ortamlarında çok işe yarar, üretimde ise en korkulan komuttur.
+
+## State: Terraform'un hafızası
+
+Burası Terraform'un en kritik ve yeni başlayanların en çok tökezlediği konusu.
+
+Terraform, kodunuzla gerçek dünya arasındaki eşleşmeyi bir **state dosyasında** tutar (`terraform.tfstate`). Bu dosyada "kodumdaki `digitalocean_droplet.web`, gerçekte `123456` numaralı sunucudur" bilgisi yazar.
+
+Neden gerekli? Çünkü kodda ismini değiştirdiğinizde Terraform'un "bu yeni bir sunucu mu, yoksa eskisinin adı mı değişti?" sorusuna cevap verebilmesi lazım. State olmasaydı her `apply` yeni kaynaklar yaratırdı.
+
+State ile ilgili üç kural var:
+
+**1. State dosyasını asla git'e koymayın.** İçinde veritabanı parolaları, API anahtarları gibi hassas değerler **düz metin olarak** durur. `.gitignore`'a `*.tfstate*` yazmak ilk işiniz olsun.
+
+**2. Ekip çalışıyorsanız uzak backend kullanın.** State yerel diskinizde durursa ekip arkadaşınızın Terraform'u sizin ne yaptığınızı bilemez. Çözüm, state'i paylaşılan bir yerde tutmak:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "sirket-terraform-state"
+    key          = "production/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true   # eşzamanlı apply'ları engeller
+  }
+}
+```
+
+**3. Kilitleme (locking) şart.** İki kişi aynı anda `apply` çalıştırırsa state bozulur ve bu, çözülmesi en can sıkıcı hatalardan biridir. Yukarıdaki `use_lockfile` bunu engeller.
+
+**State'i elle düzenlemeyin.** Bir şeyi düzeltmeniz gerekiyorsa `terraform state mv`, `terraform state rm` gibi komutlar var; JSON'u editörde açıp kurcalamak neredeyse her zaman daha büyük bir soruna dönüşür.
+
+## Değişkenler ve ortamlar
+
+Aynı kodu staging ve production için kullanmak istersiniz. Değişkenler bunun için:
+
+```hcl
+variable "ortam" {
+  type        = string
+  description = "Ortam adı: staging veya production"
+
+  validation {
+    condition     = contains(["staging", "production"], var.ortam)
+    error_message = "Ortam yalnızca staging ya da production olabilir."
+  }
+}
+
+variable "sunucu_boyutu" {
+  type    = string
+  default = "s-1vcpu-1gb"
+}
+
+resource "digitalocean_droplet" "web" {
+  name   = "web-${var.ortam}"
+  size   = var.sunucu_boyutu
+  region = "fra1"
+  image  = "ubuntu-24-04-x64"
+}
+```
+
+`validation` bloğu güzel bir detay: yanlış bir değer girildiğinde altyapı kurulmaya çalışılmadan, daha plan aşamasında anlaşılır ve okunabilir bir hata verir.
+
+Değerleri `.tfvars` dosyalarıyla verirsiniz:
+
+```bash
+terraform apply -var-file="production.tfvars"
+```
+
+**Sırları (secret) tfvars dosyasına yazıp git'e koymayın.** Doğru yöntem ortam değişkenleri (`TF_VAR_do_token`) ya da bir sır yöneticisidir.
+
+## Modüller: tekrarı bitirmek
+
+Aynı yapıyı üç ortamda kuruyorsanız kodu üç kez kopyalamak istemezsiniz. **Modül**, Terraform'un fonksiyonu gibi düşünülebilir — parametre alan, yeniden kullanılabilir bir kod paketi.
+
+```hcl
+# modules/web-sunucu/main.tf
+variable "ortam" { type = string }
+variable "boyut" { type = string }
+
+resource "digitalocean_droplet" "this" {
+  name   = "web-${var.ortam}"
+  size   = var.boyut
+  region = "fra1"
+  image  = "ubuntu-24-04-x64"
+}
+
+output "ip" {
+  value = digitalocean_droplet.this.ipv4_address
+}
+```
+
+Kullanımı:
+
+```hcl
+module "staging" {
+  source = "./modules/web-sunucu"
+  ortam  = "staging"
+  boyut  = "s-1vcpu-1gb"
+}
+
+module "production" {
+  source = "./modules/web-sunucu"
+  ortam  = "production"
+  boyut  = "s-4vcpu-8gb"
+}
+```
+
+Aynı tanım, iki ortam, tek kaynak. [Terraform Registry](https://registry.terraform.io/) üzerinde hazır modüller de var — ama üretimde kullanacağınız bir modülü sürümüne sabitleyin ve içine bir kez bakın; sonuçta altyapınızı kuracak kod o.
+
+## Ekip olarak kullanmak
+
+Tek kişilik projede Terraform'u yerelden çalıştırmak sorun değil. Ekip devreye girince birkaç şey gerekiyor:
+
+- **Uzak state + kilitleme** — yukarıda anlattığım gibi, tartışmasız ilk gereksinim.
+- **CI/CD'de otomatik plan** — pull request açıldığında `terraform plan` çalışsın, çıktısı yorum olarak PR'a düşsün. İnceleyen kişi "bu değişiklik neyi bozacak" sorusunu koda bakarak değil, plana bakarak cevaplar.
+- **Apply yalnızca merge sonrası** — üretim değişikliği kimsenin laptop'ından çıkmasın.
+- **`terraform fmt` ve `validate`** — biçim ve sözdizimi kontrolü, ucuz ve etkili.
+
+Statik analiz araçları da var: `tflint` yaygın hataları yakalar, `tfsec`/`checkov` güvenlik açıklarını (herkese açık S3 kovası, şifresiz disk) daha plan aşamasında bulur.
+
+## Sık yapılan hatalar
+
+Baştan bilmek, sonradan öğrenmekten ucuz:
+
+**State'i git'e koymak.** İçindeki sırlar repoya sızar. `.gitignore` ilk gün yazılır.
+
+**Planı okumadan apply demek.** `-/+` işaretini fark etmemek, bir veritabanının silinip yeniden oluşturulmasına yol açabilir.
+
+**Provider sürümünü sabitlememek.** `version` yazmazsanız bugün çalışan kod, provider'ın yeni sürümü çıktığında farklı davranabilir. `~> 2.0` gibi bir kısıt ve commit'lenen `.terraform.lock.hcl` dosyası bunu önler.
+
+**Terraform'la kurup panelden değiştirmek.** Drift buradan doğar. Kaynak Terraform'la yönetiliyorsa tüm değişiklikler Terraform'dan geçmeli. (Yine de olduysa `terraform plan` farkı gösterir; `terraform apply` kodda yazana geri çeker.)
+
+**Her şeyi tek bir state'e koymak.** Projeler büyüdükçe tek dev state, her küçük değişikliği yavaşlatır ve riski artırır. Ortamları ve katmanları ayırın.
+
+**Mevcut altyapıyı unutmak.** Terraform'a geçerken var olan kaynakları `import` bloğu ile state'e alabilirsiniz; sıfırdan kurmanız gerekmez.
+
+## Odadaki fil: BUSL ve OpenTofu
+
+Bu yazının en güncel ve en çok atlanan kısmı burası.
+
+Terraform 2023 Ağustos'una kadar tam anlamıyla açık kaynaktı (MPL 2.0). HashiCorp o tarihte lisansı **BUSL**'a (Business Source License) çevirdi. BUSL, açık kaynak tanımına uymuyor: kodu okuyabilir, kullanabilirsiniz — ama HashiCorp ile rekabet eden bir ürün yapamazsınız.
+
+Topluluğun tepkisi bir fork oldu: **OpenTofu**. MPL 2.0 lisanslı, Linux Foundation çatısı altında yönetiliyor ve 2025 Nisan'ında CNCF'e kabul edildi.
+
+Bugünkü tablo (Temmuz 2026 itibarıyla, sürümleri kendi depolarından doğruladım):
+
+| | Terraform | OpenTofu |
+| --- | --- | --- |
+| Güncel sürüm | v1.15.8 (8 Tem 2026) | v1.12.5 (21 Tem 2026) |
+| Lisans | BUSL | MPL 2.0 (gerçek açık kaynak) |
+| Yönetim | HashiCorp (IBM bünyesinde) | Linux Foundation / CNCF |
+
+**Peki hangisini kullanmalı?**
+
+Pratik tarafı şu: HCL sözdizimi ikisinde de aynı, provider protokolü değişmedi — **her Terraform provider'ı OpenTofu'da da çalışıyor.** Geçiş çoğu durumda `terraform` komutunu `tofu` ile değiştirmekten ibaret.
+
+Kısa cevap: bir ürünün içine gömülü altyapı aracı yazıyorsanız ya da kurumunuzun lisans politikası BUSL'a kapalıysa OpenTofu'ya bakın; kendi altyapınızı yönetiyorsanız ve BUSL sizi engellemiyorsa acele etmenize gerek yok.
+
+Lisansın tam olarak neyi kısıtladığını, iki projenin bu üç yılda nerede ayrıştığını (state şifreleme gibi) ve geçişin adım adım nasıl yapıldığını ayrı bir yazıda detaylandırdım: [OpenTofu nedir, Terraform'dan farkı ne?](/blog/opentofu-nedir-terraform-farki)
+
+## Terraform ne değildir?
+
+Sınırı çizmek de faydalı:
+
+- **Yapılandırma yönetim aracı değildir.** Sunucuyu kurar ama içine ne kurulacağını yönetmez — orası Ansible'ın, Chef'in ya da bir Docker imajının işi. Pratikte Terraform sunucuyu ayağa kaldırır, gerisini bir başlangıç betiği veya konteyner devralır.
+- **Konteyner orkestratörü değildir.** Kubernetes cluster'ını *kurabilir* ama içindeki pod'ları yönetmez. Konteyner tarafına meraklıysanız [Kubernetes nedir yazıma](/blog/kubernetes-nedir-ve-neden-kullanilir) ve [Node.js uygulamasını Kubernetes'e deploy etme rehberime](/blog/kubernetes-uzerinde-nodejs-express-uygulamasi-deploy-etme-vpsden-uretime-kapsamli-rehber) bakabilirsiniz.
+- **Sihirli bir geri alma tuşu değildir.** Silinen bir veritabanını geri getirmez. Yedek, yine sizin sorumluluğunuzda.
+
+## Nereden başlamalı?
+
+Öğrenmenin en hızlı yolu küçük ve gerçek bir şeyle başlamak:
+
+1. Ücretsiz katmanı olan bir sağlayıcı seçin (Cloudflare DNS iyi bir başlangıç — bedava ve yıkıcı değil).
+2. Tek bir kaynak tanımlayın. `init`, `plan`, `apply` yapın.
+3. Kodda bir şey değiştirip tekrar `plan` çalıştırın — Terraform'un farkı nasıl hesapladığını görün.
+4. `destroy` ile temizleyin. Bu döngüyü bir kez yaşadığınızda mantık oturuyor.
+5. Sonra state'i uzağa taşıyın, ardından modüllere geçin.
+
+Sonra kalan tek adım, panelde tıklama refleksinizi bırakmak. İlk birkaç hafta daha yavaş ilerlediğinizi hissedersiniz; üçüncü ortamı kurarken neden buna değdiğini anlarsınız.
+
+Sorularınız olursa yazın, memnuniyetle konuşurum. 🚀

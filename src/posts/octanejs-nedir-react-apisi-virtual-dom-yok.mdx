@@ -63,7 +63,7 @@ Derleyici de akıllı davranıyor: üçüncü elemanı destructure etmezseniz ge
 
 ## Fark 2: Dependency array yazmak opsiyonel
 
-React'te `useEffect`'in bağımlılık dizisi, `exhaustive-deps` lint kuralıyla birlikte muhtemelen en çok tartışılan API. Octane'de ikinci argümanı hiç yazmazsanız derleyici bağımlılıkları closure'dan kendisi çıkarıyor:
+React'te `useEffect`'in dependency array'i, `exhaustive-deps` lint kuralıyla birlikte muhtemelen en çok tartışılan API. Octane'de ikinci argümanı hiç yazmazsanız derleyici bağımlılıkları closure'dan kendisi çıkarıyor:
 
 ```tsx
 // React:

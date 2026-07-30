@@ -11,6 +11,8 @@
     "json",
     "html",
     "php",
-    "vue"
+    "vue",
+    "hcl",
+    "text"
   ]
 }

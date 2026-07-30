@@ -30,8 +30,8 @@ Peki bu ne demek, neden yapıldı ve sizin projeniz için ne anlama geliyor? Tek
 TypeScript derleyicisi bugüne kadar kendi diliyle, yani TypeScript ile yazılıyordu (buna self-hosting deniyor). Şık bir mühendislik geleneği olsa da pratik bir bedeli vardı: derleyici, sonuçta **JavaScript olarak** çalışıyordu. Yani:
 
 - **JIT ısınması:** Node.js her `tsc` çalıştırdığınızda kodu önce yorumluyor, sıcak yolları sonradan optimize ediyor. Kısa ömürlü CLI süreçleri için en kötü senaryo.
-- **Tek iş parçacığı:** JavaScript'in doğası gereği tip denetimi tek thread üzerinde koşuyordu. 16 çekirdekli makinenizde `tsc` çalışırken 15 çekirdek boş oturuyordu.
-- **Çöp toplayıcı baskısı:** Milyonlarca küçük AST düğümü, JS nesne modeliyle temsil edilince bellek kullanımı şişiyor, GC sürekli devreye giriyordu.
+- **Tek thread:** JavaScript'in doğası gereği tip denetimi tek thread üzerinde koşuyordu. 16 çekirdekli makinenizde `tsc` çalışırken 15 çekirdek boş oturuyordu.
+- **GC baskısı:** Milyonlarca küçük AST düğümü, JS nesne modeliyle temsil edilince bellek kullanımı şişiyor, GC sürekli devreye giriyordu.
 
 Küçük projelerde bunlar hissedilmez. Ama VS Code, monorepo'lar veya tip-ağır kütüphaneler (tRPC, Zod, Prisma tarzı) devreye girince `tsc --noEmit` süreleri dakikalara uzayabiliyordu.
 
@@ -44,7 +44,7 @@ Microsoft'un bu konuda çok dikkatli kullandığı bir ifade var: bu bir **port*
 Bu soru duyuru gününden beri tartışılıyor. Ekibin gerekçesi gayet pragmatik:
 
 1. **Mevcut kod tabanına benzerlik.** Derleyici zaten fonksiyonel-imperatif bir stille, sınıf hiyerarşisi olmadan yazılmıştı. Go'nun struct'ları ve fonksiyonları bu yapıya neredeyse bire bir eşleniyor; Rust'a geçiş ise ownership modeli yüzünden mimariyi baştan düşünmeyi gerektirecekti.
-2. **Çöp toplayıcı.** Derleyiciler graf yapılarıyla çalışır ve bu graflarda kimin neyin sahibi olduğu belirsizdir. Go'nun GC'si burada engel değil, kolaylık.
+2. **Garbage collector.** Derleyiciler graf yapılarıyla çalışır ve bu graflarda kimin neyin sahibi olduğu belirsizdir. Go'nun GC'si burada engel değil, kolaylık.
 3. **Paylaşımlı bellekli paralellik.** Goroutine'ler sayesinde parse, tip denetimi ve emit adımları çekirdeklere dağıtılabiliyor.
 
 ## Gerçekte ne kadar hızlı?
