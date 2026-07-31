@@ -1,0 +1,143 @@
+---
+title: "GitHub Stacked Pull Requests: Nedir, Ne Değildir?"
+description: GitHub, stacked pull request'leri nihayet platformun içine gömdü ve public preview olarak yayınladı. Bu yazıda stack mantığını, katman katman review sürecini, merge davranışlarını, gh stack CLI eklentisini ve bu özelliğin neleri çözmediğini detaylıca inceliyorum.
+createdAt: 2026-07-31
+updatedAt: 2026-07-31
+coverImage: /images/github-stacked-pull-requests.png
+author:
+  name: Özgür ÖZALP
+  url: https://github.com/ozgurozalp
+  title: Writer & Developer
+  avatar: /ozgurozalp.png
+categories:
+  - git
+tags:
+  - github
+  - git
+  - pull-request
+  - code-review
+  - developer-tools
+---
+
+GitHub, dün (30 Temmuz 2026) yayınladığı [changelog duyurusuyla](https://github.blog/changelog/2026-07-30-stacked-pull-requests-are-now-in-public-preview/) **stacked pull request** özelliğinin public preview'a çıktığını açıkladı. Yıllardır Graphite, ghstack gibi üçüncü parti araçlarla çözülmeye çalışılan "büyük değişikliği küçük PR'lara bölme" problemi, artık platformun kendi içinde, mevcut review araçları ve branch korumalarıyla entegre şekilde çözülüyor.
+
+Bu yazıda özelliğin ne olduğunu, nasıl çalıştığını ve — en az onun kadar önemlisi — ne **olmadığını** resmi dokümantasyona dayanarak anlatacağım.
+
+## Stacked pull request nedir?
+
+[Resmi tanıma göre](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs) bir stack; aynı repository içinde, her biri bir alttaki PR'ın dalını hedefleyen, sıralı bir pull request zinciri. En alttaki PR trunk dalını (genelde `main`) hedefliyor, üstündeki her PR ise bir altındaki dalın üzerine kuruluyor. Yani temel değişiklikler alt katmanlarda, onlara bağımlı kod üst katmanlarda yaşıyor.
+
+Somut bir örnek: yeni bir özellik için önce veritabanı şemasını, sonra API endpoint'ini, en son da arayüzü yazacaksınız. Klasik akışta ya hepsini tek dev PR'da toplarsınız (kimse okuyamaz) ya da ilk PR merge olana kadar beklersiniz (herkes bloklanır). Stack ile üç PR'ı üst üste açarsınız:
+
+```
+PR #3: UI          →  hedefi: feature/api dalı
+PR #2: API         →  hedefi: feature/schema dalı
+PR #1: Şema        →  hedefi: main
+```
+
+Her PR sadece kendi katmanının diff'ini gösterir; reviewer 2000 satırlık bir yığın yerine 200 satırlık odaklı bir değişiklik okur.
+
+## Hangi sorunu çözüyor?
+
+Stacked PR fikri yeni değil — Meta ve Google gibi şirketlerin iç araçlarında yıllardır var, GitHub üzerinde de üçüncü parti araçlarla yapılabiliyordu. Yeni olan, bunun **native** hale gelmesi. Dokümantasyonun kendisi de üç somut soruna işaret ediyor:
+
+1. **Bekleme problemi:** Devam eden bir PR'ın üstüne yeni PR açabiliyorsunuz; alttaki merge olsun diye beklemek yok. Ekip, kısa ve dar kapsamlı PR'ları paralel şekilde inceleyebiliyor.
+2. **Manuel rebase zinciri:** Eskiden alttaki dal değiştiğinde üstteki tüm dalları elle rebase etmeniz gerekiyordu. Artık GitHub bunu otomatik yönetiyor — alttaki PR merge olduğunda kalan dallar otomatik rebase edilip bir sonraki PR trunk'a yeniden hedefleniyor.
+3. **CI ve koruma kurallarının kör noktası:** Base'i `main` olmayan PR'larda `main` için tanımlı workflow'lar tetiklenmezdi. Yeni modelde her katman, stack'in base dalını hedefliyormuş gibi değerlendiriliyor.
+
+GitHub duyuruda bu özelliği özellikle **AI destekli, yüksek hacimli geliştirme** dönemine bağlıyor: coding agent'lara verilen görevlerin her biri ayrı bir katmana denk düşüyor ve zincir halinde incelenebiliyor. Vercel (Next.js ekibi), TED ve WHOOP gibi erken kullanıcıların geri bildirimleri de duyuruda yer alıyor.
+
+## Nasıl çalışıyor?
+
+### Stack map
+
+Web arayüzünde her stack PR'ının merge kutusunda bir **stack map** görünüyor: stack'teki tüm PR'lar, durumları ve hiyerarşi — en altta trunk olacak şekilde. PR başlığının yanındaki stack ikonu kaçıncı katmanda olduğunuzu gösteriyor ve tek tıkla katmanlar arasında gezebiliyorsunuz. Böylece "bu 200 satır, büyük resmin neresinde?" sorusu her an cevaplı.
+
+### Review süreci
+
+Her PR yalnızca kendi katmanının diff'ini (kendi dalı ile bir alttaki dal arasındaki farkı) gösteriyor ve bağımsız olarak incelenip üzerinde iterasyon yapılabiliyor. Tek kural şu: bir katmandaki kod başka bir katmandaki koda bağımlıysa, o bağımlılık ya aynı dalda ya da daha alttaki bir dalda olmalı.
+
+### Merge davranışı
+
+İşin en kritik kısmı burası. [Referans dokümanına göre](https://docs.github.com/en/pull-requests/reference/stacked-pull-requests) kurallar şöyle:
+
+- **Yukarıdan merge:** Stack'in en üstündeki (veya ortasındaki) hazır bir PR'ı merge ettiğinizde, o PR ve altındaki merge edilmemiş tüm katmanlar **tek atomik işlemle** merge oluyor.
+- **Aşağıdan merge:** Sadece en alttaki katmanı merge ederseniz üstteki PR'lar açık kalıyor, otomatik olarak rebase edilip stack'in base dalına yeniden hedefleniyor.
+- **Sıra:** Merge her zaman aşağıdan yukarıya işliyor; bir PR ancak kendisi **ve altındaki tüm PR'lar** branch koruma gereksinimlerini karşılıyorsa merge edilebiliyor.
+- **Yöntemler:** Merge commit, squash ve rebase'in üçü de destekleniyor; sonuç, PR'ları tek tek sırayla merge etmişsiniz gibi aynı history'yi üretiyor.
+- **Lineer history şartı:** Stack, dalları arasında tamamen lineer bir history korumak zorunda. Bozulursa CLI'da `gh stack rebase` + `gh stack push` ile ya da web'deki "Rebase stack" düğmesiyle **cascading rebase** çalıştırıp düzeltiyorsunuz.
+
+### Branch korumaları ve CI
+
+Bence tasarımın en akıllıca kararı şu: stack'teki **her** PR, doğrudan hedeflediği dala göre değil, stack'in base dalına (`main`) göre değerlendiriliyor. Yani:
+
+- Required review'lar ve required status check'ler her katman için `main` kurallarına göre işliyor.
+- CODEOWNERS her katmanın kendi değişikliklerine göre hesaplanıyor.
+- `main` hedefli tanımlanmış GitHub Actions workflow'ları, sadece en alttaki için değil stack'teki her PR için tetikleniyor.
+
+Kısacası ortadaki bir katman, "base'i main değil" diye korumalardan sıyrılamıyor. Duyurunun ifadesiyle mevcut korumalar ve zorunlu check'ler `main`'e neyin ulaşacağını yönetmeye aynen devam ediyor.
+
+### Merge queue
+
+Merge queue desteği de geliyor (kademeli olarak, önümüzdeki haftalarda): stack'in tüm PR'ları kuyruğa doğru sırada giriyor; bir PR kuyruktan çıkarılırsa üstündekiler de çıkarılıyor. İlginç bir detay: bir stack'i tek merge grubuna sığdırabilmek için grup, yapılandırılmış maksimum boyutu %50'ye kadar aşabiliyor.
+
+## Nasıl başlanır?
+
+İki yol var: CLI ve web arayüzü.
+
+### GitHub CLI ile (gh-stack eklentisi)
+
+[Quickstart dokümanındaki](https://docs.github.com/en/pull-requests/get-started/stacked-prs-quickstart) akış şöyle:
+
+```bash
+gh extension install github/gh-stack
+```
+
+```bash
+# Stack'i başlat — ilk dalı trunk üzerine oluşturup checkout eder
+gh stack init
+
+# Kod yaz, commitle; sonra bir üst katman için yeni dal ekle
+gh stack add feature-api
+
+# Hatta stage + commit + yeni dalı tek komutta:
+gh stack add -Am "API endpoint eklendi"
+
+# Tüm dalları remote'a gönder
+gh stack push
+
+# PR'ları doğru base dallarıyla oluştur ve stack olarak bağla
+gh stack submit
+
+# Durumu gör: dallar, PR linkleri, statüler, son commit
+gh stack view
+```
+
+### Web arayüzü ile
+
+CLI şart değil. İlk PR'ı normal şekilde (`main` hedefli) açıyorsunuz; ikinci PR'ı açarken base dalını ilk PR'ın dalı olarak seçip **Create stack** seçeneğini işaretliyorsunuz. GitHub ikisini stack olarak bağlıyor. Web, CLI, GitHub Mobile ve webhooks/REST/GraphQL üzerinden programatik erişimin tamamı destekleniyor; hatta Copilot coding agent için `gh-stack` skill'i bile var.
+
+## Peki ne değildir?
+
+Duyuru metinleri hep parlak taraflardan bahseder; sınırları bilmek de en az o kadar önemli:
+
+- **GA (genel erişim) değil.** Public preview — önümüzdeki günlerde tüm repository'lere kademeli açılıyor ve davranışlar değişebilir. Kritik süreçlerinizi hemen buna bağlamadan önce ekipçe denemek mantıklı.
+- **Cross-fork stack yok.** Tüm dallar aynı repository'de olmak zorunda. Fork'tan katkı alan açık kaynak akışlarında dış katkıcılar stack açamıyor.
+- **GitHub Desktop desteği yok.** Web, CLI ve Mobile'da var; Desktop uygulamasında yok.
+- **Merge queue desteği henüz her yerde değil.** Kademeli olarak önümüzdeki haftalarda yayılacak.
+- **Lineer olmayan history ile çalışmaz.** Stack dalları arasında merge commit'lerle örülmüş bir yapıya izin yok; kirlenirse cascading rebase ile düzeltmeniz gerekiyor.
+- **Sihirli değnek değil.** Stack, ancak değişikliği anlamlı katmanlara bölme disiplinine sahipseniz işe yarıyor. 2000 satırlık bir PR'ı "hepsi tek katman" olarak stack'e koymak hiçbir şey kazandırmıyor; bağımlılıkları doğru sıralamak hâlâ sizin işiniz.
+- **Üçüncü parti araçların icadı değil, resmileşmesi.** Graphite, ghstack ve benzeri araçlar bu iş akışını yıllardır sunuyordu. GitHub'ın yaptığı yenilik akışın kendisi değil; stack map, otomatik retarget, branch korumaları ve merge queue ile **platform seviyesinde** entegrasyon.
+
+## Kapanış
+
+Trunk-based development ile "küçük PR" kültürü arasındaki en büyük sürtünme, bağımlı değişiklikleri yönetmenin manuel yüküydü. GitHub bu yükü platforma alarak ciddi bir boşluğu kapatıyor — özellikle de agent'ların kod ürettiği, PR hacminin arttığı şu dönemde. Preview sürecinde denemek isterseniz [dokümantasyondan](https://docs.github.com/en/pull-requests/how-tos/stacked-pull-requests) başlayabilir, geri bildirimlerinizi GitHub'ın community tartışmasına bırakabilirsiniz.
+
+### Kaynaklar
+
+- [Stacked pull requests are now in public preview — GitHub Changelog](https://github.blog/changelog/2026-07-30-stacked-pull-requests-are-now-in-public-preview/)
+- [About stacked pull requests — GitHub Docs](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs)
+- [Quickstart for stacked pull requests — GitHub Docs](https://docs.github.com/en/pull-requests/get-started/stacked-prs-quickstart)
+- [Stacked pull requests reference — GitHub Docs](https://docs.github.com/en/pull-requests/reference/stacked-pull-requests)
+- [Creating stacked pull requests — GitHub Docs](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/creating-stacked-pull-requests)
+- [gh-stack CLI eklentisi — GitHub](https://github.com/github/gh-stack)
